@@ -1,4 +1,4 @@
-import { useReducer, useCallback } from 'react'
+import { useReducer, useCallback, useState } from 'react'
 import {
   Upload, Eye, Briefcase, Hash, Target, Wand2,
   GitCompare, Download, Mail, KeyRound, RotateCcw,
@@ -16,7 +16,7 @@ import { ResumeOptimizer } from '@/components/ResumeOptimizer'
 import { DiffViewer } from '@/components/DiffViewer'
 import { ExportOptions } from '@/components/ExportOptions'
 import { CoverLetterGenerator } from '@/components/CoverLetterGenerator'
-import type { AppState, AppStep, ResumeData, JobDescriptionData, OptimizedResume } from '@/types'
+import type { AppState, AppStep, ResumeData, JobDescriptionData, OptimizedResume, KeywordAnalysis as KeywordAnalysisType } from '@/types'
 import { scoreResume } from '@/lib/atsAnalyzer'
 import { analyzeKeywords } from '@/lib/keywordMatcher'
 import { parseResumeLocal } from '@/lib/openaiService'
@@ -46,6 +46,7 @@ type Action =
   | { type: 'SET_RESUME'; payload: { rawText: string; fileName: string } }
   | { type: 'SET_RESUME_DATA'; payload: ResumeData }
   | { type: 'SET_JOB_DATA'; payload: JobDescriptionData }
+  | { type: 'MERGE_KEYWORD_AI'; payload: Partial<KeywordAnalysisType> }
   | { type: 'SET_OPTIMIZED'; payload: OptimizedResume }
   | { type: 'SET_COVER_LETTER'; payload: string }
   | { type: 'SET_STEP'; payload: AppStep }
@@ -87,6 +88,11 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
 
+    case 'MERGE_KEYWORD_AI':
+      return state.keywordAnalysis
+        ? { ...state, keywordAnalysis: { ...state.keywordAnalysis, ...action.payload } }
+        : state
+
     case 'SET_OPTIMIZED':
       return {
         ...state,
@@ -126,6 +132,7 @@ const STEPS: { id: AppStep; label: string; icon: React.ReactNode; requiresResume
 
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
+  const [aiKeywordLoading, setAiKeywordLoading] = useState(false)
 
   const setStep = useCallback((step: AppStep) => {
     dispatch({ type: 'SET_STEP', payload: step })
@@ -146,6 +153,23 @@ export default function App() {
       })()
     }
   }, [state.aiConfig, hasAI])
+
+  // Fires after job description is parsed — runs local analysis instantly,
+  // then asynchronously enriches it with AI semantic matching when available.
+  const handleJobDataAnalyzed = useCallback(async (jd: JobDescriptionData) => {
+    dispatch({ type: 'SET_JOB_DATA', payload: jd })
+    if (!hasAI) return
+    setAiKeywordLoading(true)
+    try {
+      const { analyzeKeywordsWithAI } = await import('@/lib/keywordMatcher')
+      const insights = await analyzeKeywordsWithAI(state.resumeRawText, jd, state.aiConfig)
+      dispatch({ type: 'MERGE_KEYWORD_AI', payload: insights })
+    } catch {
+      // silently fall back to local analysis — user still sees results
+    } finally {
+      setAiKeywordLoading(false)
+    }
+  }, [state.resumeRawText, state.aiConfig, hasAI])
 
   const currentStepIndex = STEPS.findIndex(s => s.id === state.step)
   const hasResume = !!state.resumeRawText
@@ -284,7 +308,7 @@ export default function App() {
             {/* Job Description */}
             {state.step === 'job-description' && hasResume && (
               <StepWrapper title="Job Description" subtitle="Paste the job posting to unlock keyword gap analysis and targeted optimization." icon={<Briefcase className="w-5 h-5 text-cyan-400" />} nextStep={() => setStep('analysis')} nextLabel="View Analysis →" skipStep={() => setStep('optimize')} skipLabel="Skip to Optimize">
-                <JobDescriptionInput aiConfig={state.aiConfig} resumeRawText={state.resumeRawText} onAnalyzed={jd => dispatch({ type: 'SET_JOB_DATA', payload: jd })} jobData={state.jobData} />
+                <JobDescriptionInput aiConfig={state.aiConfig} resumeRawText={state.resumeRawText} onAnalyzed={handleJobDataAnalyzed} jobData={state.jobData} />
               </StepWrapper>
             )}
 
@@ -301,7 +325,7 @@ export default function App() {
                   {state.keywordAnalysis && (
                     <section>
                       <h3 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Keyword Analysis</h3>
-                      <KeywordAnalysis analysis={state.keywordAnalysis} />
+                      <KeywordAnalysis analysis={state.keywordAnalysis} isAILoading={aiKeywordLoading} />
                     </section>
                   )}
                   {!state.keywordAnalysis && !state.jobData && (

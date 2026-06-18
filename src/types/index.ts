@@ -39,11 +39,28 @@ export interface JobDescriptionData {
   rawText: string
 }
 
+export interface AIKeywordMatch {
+  keyword: string
+  context: string
+  strength: 'strong' | 'moderate' | 'weak'
+}
+
+export interface AIKeywordMissing {
+  keyword: string
+  importance: 'critical' | 'high' | 'medium' | 'low'
+  suggestion: string
+}
+
 export interface KeywordAnalysis {
   matching: string[]
   missing: string[]
   related: string[]
   coveragePercent: number
+  // AI-enhanced fields — populated when an API key / Ollama is available
+  aiMatching?: AIKeywordMatch[]
+  aiMissing?: AIKeywordMissing[]
+  aiSummary?: string
+  aiCoveragePercent?: number
 }
 
 export interface AtsIssue {

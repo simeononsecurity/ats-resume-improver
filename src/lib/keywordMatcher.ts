@@ -1,4 +1,6 @@
-import type { JobDescriptionData, KeywordAnalysis } from '../types'
+import type { JobDescriptionData, KeywordAnalysis, AIKeywordMatch, AIKeywordMissing } from '../types'
+import type { AIConfig } from './aiProvider'
+import { callAI } from './aiProvider'
 
 // Common tech skill synonyms / related terms
 const SKILL_RELATIONS: Record<string, string[]> = {
@@ -165,5 +167,60 @@ export function parseJobDescriptionLocal(text: string): Partial<JobDescriptionDa
     certifications: [...new Set(certifications)],
     responsibilities: [],
     rawText: text,
+  }
+}
+
+// ─── AI-Powered Keyword Analysis ──────────────────────────────────────────────
+
+/**
+ * Uses the configured AI provider to perform a semantic keyword comparison
+ * between the resume and job description. Returns enriched match/gap data with
+ * context, strength ratings, importance levels, and suggestions.
+ *
+ * Falls back gracefully — callers should catch errors and keep local analysis.
+ */
+export async function analyzeKeywordsWithAI(
+  resumeText: string,
+  jobData: JobDescriptionData,
+  config: AIConfig,
+): Promise<{ aiMatching: AIKeywordMatch[]; aiMissing: AIKeywordMissing[]; aiSummary: string; aiCoveragePercent: number }> {
+  const system =
+    `You are an expert ATS (Applicant Tracking System) analyst. ` +
+    `Compare a resume to a job description and identify every relevant keyword, skill, technology, certification, and qualification. ` +
+    `Always respond with valid JSON only — no markdown fences, no extra explanation.`
+
+  const user =
+    `Analyze this resume against the job description.\n` +
+    `Return ONLY valid JSON matching this exact structure:\n` +
+    `{\n` +
+    `  "matching": [\n` +
+    `    { "keyword": "skill name", "context": "where/how found in resume", "strength": "strong" }\n` +
+    `  ],\n` +
+    `  "missing": [\n` +
+    `    { "keyword": "skill name", "importance": "critical", "suggestion": "brief actionable tip" }\n` +
+    `  ],\n` +
+    `  "summary": "2-3 sentence overview with top 1-2 recommendations",\n` +
+    `  "coveragePercent": 75\n` +
+    `}\n\n` +
+    `strength values: "strong" (explicitly mentioned), "moderate" (implied by related experience), "weak" (tangentially related)\n` +
+    `importance values: "critical" (required/must-have), "high" (strongly preferred), "medium" (preferred), "low" (nice-to-have)\n\n` +
+    `RESUME:\n${resumeText.slice(0, 3000)}\n\n` +
+    `JOB DESCRIPTION:\n${jobData.rawText.slice(0, 2000)}`
+
+  const raw = await callAI(config, system, user, 0.1)
+
+  // Strip optional markdown code fences
+  const cleaned = raw.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/g, '').trim()
+  // Extract the JSON object
+  const jsonStart = cleaned.indexOf('{')
+  const jsonEnd = cleaned.lastIndexOf('}')
+  if (jsonStart === -1 || jsonEnd === -1) throw new Error('AI response contained no JSON object')
+  const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1))
+
+  return {
+    aiMatching: Array.isArray(parsed.matching) ? (parsed.matching as AIKeywordMatch[]) : [],
+    aiMissing: Array.isArray(parsed.missing) ? (parsed.missing as AIKeywordMissing[]) : [],
+    aiSummary: typeof parsed.summary === 'string' ? parsed.summary : '',
+    aiCoveragePercent: typeof parsed.coveragePercent === 'number' ? Math.min(100, Math.max(0, parsed.coveragePercent)) : 0,
   }
 }
