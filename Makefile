@@ -1,7 +1,8 @@
 .DEFAULT_GOAL := help
 .PHONY: help install dev build preview clean \
         docker-dev docker-dev-down docker-prod docker-prod-down \
-        docker-build docker-clean logs
+        docker-build docker-clean logs \
+        ollama ollama-down ollama-pull docker-dev-with-ollama
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Colours
@@ -72,3 +73,23 @@ docker-clean: ## Remove all project Docker images and volumes
 
 logs: ## Tail logs from all running containers
 	docker compose logs -f
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Ollama — Local LLM server
+# ──────────────────────────────────────────────────────────────────────────────
+ollama: ## Start Ollama container only (http://localhost:11434)
+	docker compose up -d ollama
+	@echo ""
+	@echo "  $(CYAN)Ollama$(RESET) is running at http://localhost:11434"
+	@echo "  Pull a model with: $(CYAN)make ollama-pull MODEL=llama3.2$(RESET)"
+	@echo ""
+
+ollama-down: ## Stop & remove the Ollama container (data volume is preserved)
+	docker compose stop ollama
+	docker compose rm -f ollama
+
+ollama-pull: ## Pull an Ollama model (usage: make ollama-pull MODEL=llama3.2)
+	docker compose exec ollama ollama pull $(MODEL)
+
+docker-dev-with-ollama: ## Build & start dev container + Ollama side-by-side
+	docker compose up --build dev ollama
