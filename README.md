@@ -1,6 +1,6 @@
 # ATS Resume Match — AI Career Intelligence
 
-> Self-hostable ATS resume optimizer. All parsing & scoring runs in your browser — AI features optionally call OpenAI using your own key.
+> Self-hostable ATS resume optimizer. Parsing & scoring runs entirely in your browser. AI features support **OpenAI**, **Anthropic Claude**, and **Ollama (local)** — bring your own key or run fully offline.
 
 [![GitHub Stars](https://img.shields.io/github/stars/simeononsecurity/ats-resume-improver?style=flat)](https://github.com/simeononsecurity/ats-resume-improver/stargazers)
 [![GitHub Actions](https://github.com/simeononsecurity/ats-resume-improver/actions/workflows/deploy.yml/badge.svg)](https://github.com/simeononsecurity/ats-resume-improver/actions)
@@ -10,30 +10,93 @@
 
 ## ✨ Features
 
-| Feature | Without API Key | With OpenAI API Key |
-|---|---|---|
-| Resume Upload (PDF, DOCX, TXT, MD) | ✅ | ✅ |
-| ATS Text Extraction & "What the ATS Sees" View | ✅ | ✅ |
-| **Resume Type Detection** (7 profiles) | ✅ | ✅ |
-| **Dynamic Section Ordering** (profile-aware) | ✅ | ✅ |
-| Section Detection & Formatting Warnings | ✅ | ✅ |
-| ATS Score (0–100) with 5-dimension breakdown | ✅ | ✅ |
-| Keyword Gap Analysis | ✅ (rule-based) | ✅ (AI-enhanced) |
-| Resume Structuring | ✅ (local parser) | ✅ (GPT-4.1 / GPT-4o / more) |
-| Deterministic ATS Optimization | ✅ | ✅ |
-| AI Resume Optimization | ❌ | ✅ (your choice of model) |
-| Job Description Parsing | ✅ (rule-based) | ✅ (AI cross-referenced) |
-| Before/After Diff Viewer | ✅ | ✅ |
-| Export PDF / DOCX / TXT / MD | ✅ (professional templates) | ✅ (**AI-Enhanced** export) |
-| Cover Letter Generation | ❌ | ✅ |
-| **Model Selector** (6 OpenAI models) | — | ✅ |
+| Feature | No AI Key | Cloud AI (OpenAI / Anthropic) | Local AI (Ollama) |
+|---|---|---|---|
+| Resume Upload (PDF, DOCX, TXT, MD) | ✅ | ✅ | ✅ |
+| ATS Text Extraction & "What the ATS Sees" View | ✅ | ✅ | ✅ |
+| **Resume Type Detection** (7 profiles) | ✅ | ✅ | ✅ |
+| **Dynamic Section Ordering** (profile-aware) | ✅ | ✅ | ✅ |
+| Section Detection & Formatting Warnings | ✅ | ✅ | ✅ |
+| ATS Score (0–100) with 5-dimension breakdown | ✅ | ✅ | ✅ |
+| Keyword Gap Analysis | ✅ rule-based | ✅ **AI semantic** | ✅ **AI semantic** |
+| Resume Structuring | ✅ local parser | ✅ AI-powered | ✅ AI-powered |
+| Deterministic ATS Optimization | ✅ | ✅ | ✅ |
+| AI Resume Optimization | ❌ | ✅ | ✅ |
+| Job Description Parsing | ✅ rule-based | ✅ AI cross-referenced | ✅ AI cross-referenced |
+| Before/After Diff Viewer | ✅ | ✅ | ✅ |
+| Export PDF / DOCX / TXT / MD | ✅ professional templates | ✅ **AI-Enhanced** | ✅ **AI-Enhanced** |
+| Cover Letter Generation | ❌ | ✅ | ✅ |
+| **Multi-provider model selector** | — | ✅ OpenAI + Claude | ✅ 8 Ollama models |
 
 ## 🔒 Privacy
 
-- **Without an API key**: everything runs 100% in your browser — no data ever leaves your device
-- **With an API key**: your resume and job description are sent **directly to OpenAI** using your own key — no intermediate server
-- API key is stored **in memory only** — it never touches disk and disappears when you close the tab
-- No analytics, no tracking, no cookies either way
+| Mode | What leaves your device? |
+|---|---|
+| **No AI key** | Nothing — 100% local, runs in your browser |
+| **OpenAI / Anthropic** | Resume text + job description are sent **directly** to the AI provider API using **your key** — no intermediate server |
+| **Ollama (local)** | Nothing — model runs on your own machine (or Docker container) |
+
+- API keys are stored **in memory only** — they disappear when you close the tab
+- No analytics, no tracking, no cookies
+- The footer accurately reflects which mode is active
+
+## 🤖 AI Providers & Models
+
+The API key panel lets you choose provider and model. All AI calls include ATS best-practice prompts from Harvard OCS and Columbia CCE guidelines.
+
+### OpenAI
+
+| Model | Best For |
+|---|---|
+| **GPT-4.1 mini** *(default)* | Smartest fast & affordable — recommended |
+| GPT-4o mini | Fast & affordable classic |
+| GPT-4.1 | Latest GPT-4.1 — sharp instruction following |
+| GPT-4o | High quality flagship |
+| GPT-4 Turbo | Large context window |
+| GPT-3.5 Turbo | Fastest & cheapest |
+
+**Cost estimate:** ~$0.002–0.05 per resume
+
+### Anthropic Claude
+
+| Model | Best For |
+|---|---|
+| **Claude Sonnet 4.5** *(default)* | Fast & intelligent — recommended |
+| Claude Opus 4.5 | Most capable — best for complex tasks |
+| Claude Haiku 4.5 | Fastest & cheapest |
+| Claude 3.5 Sonnet | Reliable and well-tested |
+| Claude 3.5 Haiku | Fast and affordable v3.5 |
+
+### Ollama (Local / Self-hosted)
+
+No API key required. Set `OLLAMA_ORIGINS=*` to allow browser access.
+
+| Model | Notes |
+|---|---|
+| **Llama 3.3** *(default)* | Latest Meta Llama — recommended |
+| Llama 3.2 | Meta Llama 3.2 |
+| Mistral 7B | Fast & capable |
+| Mixtral 8x7B | Mixture of experts |
+| Qwen 2.5 | Alibaba Qwen 2.5 |
+| DeepSeek R1 | Strong reasoning |
+| Phi-4 | Microsoft Phi-4 |
+| Gemma 3 | Google Gemma 3 |
+
+## 🧠 AI-Powered Keyword Analysis
+
+When an AI provider is configured, the keyword gap analysis upgrades from simple string matching to **semantic analysis**:
+
+| | Without AI | With AI |
+|---|---|---|
+| Matching method | Exact string match only | Semantic understanding of context |
+| Match strength | — | Strong / Moderate / Partial ratings |
+| Match context | — | Notes like *"found in Skills and 3 job roles"* |
+| Gap importance | All gaps treated equal | Critical / High / Medium / Low ratings |
+| Suggestions | Generic tips | Per-keyword actionable suggestions |
+| Coverage % | String-count based | Semantically weighted |
+| Summary | — | 2-3 sentence AI narrative |
+
+Local analysis still runs **instantly** — AI results enrich it asynchronously while you review.
 
 ## 🧠 Resume Type Detection
 
@@ -51,21 +114,6 @@ The app automatically detects which of **7 resume profiles** best fits your resu
 
 Section ordering applies consistently across optimization, PDF, DOCX, TXT, and Markdown exports.
 
-## 🤖 AI Model Selection
-
-When an OpenAI API key is provided, choose from 6 models in the API key panel:
-
-| Model | Best For |
-|---|---|
-| **GPT-4.1 mini** *(default)* | Smartest fast & affordable — recommended |
-| GPT-4o mini | Fast & affordable classic |
-| GPT-4.1 | Latest GPT-4.1 — sharp instruction following |
-| GPT-4o | High quality flagship |
-| GPT-4 Turbo | Large context window |
-| GPT-3.5 Turbo | Fastest & cheapest |
-
-Every AI call injects ATS best-practice prompts from Harvard OCS and Columbia CCE guidelines.
-
 ## 📤 Export Quality
 
 | Format | Template |
@@ -75,7 +123,7 @@ Every AI call injects ATS best-practice prompts from Harvard OCS and Columbia CC
 | **TXT** | Clean plain-text with consistent spacing (ATS-safe) |
 | **Markdown** | Structured `.md` with headings and bullet lists |
 
-With an API key, exports are AI-formatted before download (✨ AI-Enhanced badge).
+With an AI provider configured, exports are AI-formatted before download (✨ AI-Enhanced badge).
 
 ## 🚀 Self-Hosting
 
@@ -116,6 +164,9 @@ make docker-dev
 # Production — nginx on http://localhost:8080
 make docker-prod
 
+# Dev + Ollama together (full local AI stack)
+make docker-dev-with-ollama
+
 # Or with docker compose directly
 docker compose up --build dev
 docker compose up --build prod
@@ -128,9 +179,28 @@ make build
 npx serve dist
 ```
 
+## 🦙 Ollama — Local AI
+
+Run a fully local AI stack — no API keys, no data leaving your machine.
+
+```bash
+# Start Ollama container (persists models across restarts)
+make ollama
+
+# Pull a model
+make ollama-pull MODEL=llama3.2
+
+# Start dev app + Ollama side-by-side
+make docker-dev-with-ollama
+```
+
+Then open the app, go to the API key panel, select **Ollama (Local)**, set URL to `http://localhost:11434`, and pick a model.
+
+> **Note:** The `ollama` service in `docker-compose.yml` includes an optional NVIDIA GPU `deploy` block. Remove it if you don't have an NVIDIA GPU — CPU-only works fine for smaller models.
+
 ## 🐳 Docker
 
-Multi-stage Dockerfile with dev and prod targets:
+Multi-stage Dockerfile with dev and prod targets, plus a dedicated Ollama service:
 
 ```
 Dockerfile
@@ -139,18 +209,11 @@ Dockerfile
 └── prod   — nginx 1.26 Alpine serving ./dist (port 80/8080)
 ```
 
-| Service | Target | Host port | Description |
+| Service | Target / Image | Host port | Description |
 |---|---|---|---|
 | `dev` | `dev` | 5173 | Hot-reload dev server, source-mounted |
 | `prod` | `prod` | 8080 | Optimised nginx static build |
-
-The dev service mounts the project root for instant hot-reload:
-
-```yaml
-volumes:
-  - .:/app
-  - /app/node_modules
-```
+| `ollama` | `ollama/ollama:latest` | 11434 | Local LLM server (`OLLAMA_ORIGINS=*`) |
 
 ## 🛠 Makefile Reference
 
@@ -169,20 +232,16 @@ make help
   docker-prod            Build & start prod nginx (http://localhost:8080)
   docker-prod-detach     Background prod container
   docker-prod-down       Stop prod container
+  docker-dev-with-ollama Dev container + Ollama side-by-side
+
+  ollama                 Start Ollama container (http://localhost:11434)
+  ollama-down            Stop Ollama (data volume preserved)
+  ollama-pull            Pull a model  (make ollama-pull MODEL=llama3.2)
 
   docker-build           Build both images without starting
   docker-clean           Remove all project Docker images and volumes
   logs                   Tail logs from running containers
 ```
-
-## 🔑 OpenAI API Key Setup
-
-1. Get a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-2. Enter it in the API key panel (sidebar on desktop, upload page on mobile)
-3. Select your preferred model from the dropdown
-4. The key is stored **in memory only** — gone when you close the tab
-
-**Cost estimate:** Analysing + optimising one resume costs approximately **$0.002–0.05** depending on model.
 
 ## 🏗️ Tech Stack
 
@@ -196,26 +255,26 @@ make help
 | DOCX Parse | mammoth |
 | PDF Export | jsPDF |
 | DOCX Export | docx (`Packer.toBlob`) |
-| AI | OpenAI (user-supplied key, 6 model choices) |
-| Container | Docker + nginx (multi-stage) |
+| AI | OpenAI · Anthropic Claude · Ollama (user-supplied key or local) |
+| Container | Docker + nginx (multi-stage) + Ollama service |
 
 ## 📁 Project Structure
 
 ```
 ats-resume-improver/
 ├── Dockerfile              # Multi-stage: dev / builder / prod-nginx
-├── docker-compose.yml      # dev (5173) and prod (8080) services
-├── Makefile                # 14 convenience targets
+├── docker-compose.yml      # dev (5173), prod (8080), ollama (11434)
+├── Makefile                # 18 convenience targets
 ├── .github/workflows/
 │   └── deploy.yml          # GitHub Pages auto-deploy
 └── src/
     ├── components/
     │   ├── ui/                    # Button, Card, Badge, Progress
-    │   ├── ApiKeySetup.tsx        # API key + model selector
+    │   ├── ApiKeySetup.tsx        # Multi-provider: OpenAI / Anthropic / Ollama
     │   ├── ResumeUpload.tsx       # File upload + paste
     │   ├── AtsView.tsx            # "What the ATS sees" + profile card
-    │   ├── JobDescriptionInput.tsx # Job posting (cross-referenced with resume)
-    │   ├── KeywordAnalysis.tsx    # Keyword gap visualisation
+    │   ├── JobDescriptionInput.tsx # Job posting (AI cross-referenced)
+    │   ├── KeywordAnalysis.tsx    # AI semantic keyword gap visualisation
     │   ├── AtsScore.tsx           # Score + 5-dimension breakdown
     │   ├── ResumeOptimizer.tsx    # AI / local optimizer
     │   ├── DiffViewer.tsx         # Before/after + inline exports
@@ -224,9 +283,10 @@ ats-resume-improver/
     └── lib/
         ├── documentParser.ts      # PDF / DOCX / TXT extraction
         ├── atsAnalyzer.ts         # Rule-based ATS scoring
-        ├── keywordMatcher.ts      # Keyword gap analysis
+        ├── keywordMatcher.ts      # Local + AI semantic keyword analysis
         ├── resumeTypeDetector.ts  # 7-profile detection + section ordering
-        ├── openaiService.ts       # OpenAI (6 models, ATS best-practice prompts)
+        ├── aiProvider.ts          # Unified OpenAI / Anthropic / Ollama caller
+        ├── openaiService.ts       # Resume parse + optimize prompts
         ├── openaiExport.ts        # AI-enhanced export formatting
         ├── exportService.ts       # PDF / DOCX / TXT / MD generation
         └── utils.ts
@@ -234,12 +294,14 @@ ats-resume-improver/
 
 ## 🔮 Roadmap
 
-- [ ] Additional AI providers (Anthropic Claude, Google Gemini, Ollama/local)
+- [x] Additional AI providers (Anthropic Claude, Ollama/local)
+- [x] AI-powered semantic keyword analysis with importance ratings
 - [ ] Resume version history (IndexedDB)
 - [ ] LinkedIn profile optimizer
 - [ ] Interview question predictor
 - [ ] Salary range estimator
 - [ ] Cloudflare Pages deploy button
+- [ ] Google Gemini provider support
 
 ## 🤝 Contributing
 

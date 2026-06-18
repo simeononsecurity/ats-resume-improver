@@ -410,9 +410,14 @@ export default function App() {
       </div>
 
       <footer className="border-t border-[#2e3347] py-4 px-6 text-center text-xs text-slate-700">
-        ATS Resume Match — 100% client-side • Your data never leaves your browser •{' '}
-        <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-400">
-          Self-host on GitHub Pages
+        ATS Resume Match — client-side SPA •{' '}
+        {hasAI
+          ? <span>Resume text is sent to your configured AI provider ({state.aiConfig.provider}) for analysis</span>
+          : <span>No AI key — your data never leaves your browser</span>
+        }
+        {' • '}
+        <a href="https://github.com/simeononsecurity/ats-resume-improver" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-400">
+          GitHub
         </a>
       </footer>
     </div>
