@@ -1,5 +1,6 @@
 import { downloadBlob } from './utils'
 import type { ResumeData } from '../types'
+import type { AIConfig } from './aiProvider'
 import { getSectionOrder, SECTION_TITLES } from './resumeTypeDetector'
 import type { SectionKey } from './resumeTypeDetector'
 
@@ -410,16 +411,15 @@ export async function exportDOCX(resumeData: ResumeData, fileName = 'resume-ats.
 // ─── AI-Enhanced Export ───────────────────────────────────────────────────────
 
 export async function exportWithAI(
-  apiKey: string,
+  config: AIConfig,
   resumeData: ResumeData,
   format: 'pdf' | 'docx' | 'txt',
   version: string,
   fileName: string,
-  model = 'gpt-4o-mini',
 ) {
   const mod = await import('./openaiExport.ts')
   try {
-    const formattedContent = await mod.callOpenAIForExport(apiKey, resumeData, version, model)
+    const formattedContent = await mod.callOpenAIForExport(config, resumeData, version)
     const formattedData: ResumeData = { ...resumeData, rawText: formattedContent }
     if (format === 'pdf') await exportPDF(formattedContent, fileName, formattedData)
     else if (format === 'docx') await exportDOCX(formattedData, fileName)

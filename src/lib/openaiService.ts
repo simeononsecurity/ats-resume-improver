@@ -1,19 +1,11 @@
 import type { ResumeData, JobDescriptionData, OptimizedResume, OptimizationChange } from '../types'
 import { getSectionOrder, SECTION_TITLES } from './resumeTypeDetector'
+import { callAI } from './aiProvider'
+import type { AIConfig } from './aiProvider'
 
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
-
-export const AVAILABLE_MODELS = [
-  { id: 'gpt-4.1-mini',  label: 'GPT-4.1 mini',   desc: 'Recommended — smartest fast & affordable model' },
-  { id: 'gpt-4o-mini',   label: 'GPT-4o mini',     desc: 'Fast & affordable — great default' },
-  { id: 'gpt-4.1',       label: 'GPT-4.1',         desc: 'Latest GPT-4.1 — sharp instruction following' },
-  { id: 'gpt-4o',        label: 'GPT-4o',          desc: 'High quality, flagship model' },
-  { id: 'gpt-4-turbo',   label: 'GPT-4 Turbo',     desc: 'High quality, large context window' },
-  { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo',   desc: 'Fastest & cheapest option' },
-] as const
-
-export type OpenAIModelId = typeof AVAILABLE_MODELS[number]['id']
-export const DEFAULT_MODEL: OpenAIModelId = 'gpt-4o-mini'
+// Re-export for any legacy imports
+export { MODELS_BY_PROVIDER as AVAILABLE_MODELS } from './aiProvider'
+export const DEFAULT_MODEL = 'gpt-4.1-mini'
 
 // ─── Shared ATS Best-Practices Context ────────────────────────────────────────
 
@@ -55,41 +47,6 @@ SUMMARY SECTION RULES:
   Proven track record implementing CI/CD pipelines with Jenkins and GitHub Actions, reducing deployment cycles by 40%."
 • Rewrite summary to DIRECTLY address the specific role being targeted
 `
-
-// ─── Core OpenAI Fetch ────────────────────────────────────────────────────────
-
-async function callOpenAI(
-  apiKey: string,
-  systemPrompt: string,
-  userPrompt: string,
-  temperature = 0.3,
-  model: string = DEFAULT_MODEL,
-): Promise<string> {
-  const response = await fetch(OPENAI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-    }),
-  })
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}))
-    const msg = (err as { error?: { message?: string } })?.error?.message ?? response.statusText
-    throw new Error(`OpenAI API error: ${msg}`)
-  }
-
-  const data = await response.json()
-  return data.choices?.[0]?.message?.content ?? ''
-}
 
 // ─── Parse Resume Locally (No AI) ────────────────────────────────────────────
 
@@ -159,9 +116,8 @@ export function parseResumeLocal(rawText: string): ResumeData {
 // ─── Stage 1: Parse Resume with AI ───────────────────────────────────────────
 
 export async function parseResumeWithAI(
-  apiKey: string,
+  config: AIConfig,
   resumeText: string,
-  model: string = DEFAULT_MODEL,
 ): Promise<ResumeData> {
   const system = `You are an expert resume parser and ATS specialist.
 ${ATS_EXPERTISE}
@@ -183,7 +139,7 @@ Return this exact JSON structure:
   "skills": [], "certifications": [], "rawText": ""
 }`
 
-  const raw = await callOpenAI(apiKey, system, user, 0.1, model)
+  const raw = await callAI(config, system, user, 0.1)
   try {
     return { ...JSON.parse(raw), rawText: resumeText }
   } catch {
@@ -198,10 +154,9 @@ Return this exact JSON structure:
 // ─── Stage 2: Parse Job Description with AI ──────────────────────────────────
 
 export async function parseJobDescriptionWithAI(
-  apiKey: string,
+  config: AIConfig,
   jobText: string,
   resumeRawText?: string,
-  model: string = DEFAULT_MODEL,
 ): Promise<JobDescriptionData> {
   const system = `You are an expert recruiter and ATS keyword strategist.
 ${ATS_EXPERTISE}
@@ -224,7 +179,7 @@ Return this exact JSON:
   "certifications": [], "responsibilities": [], "rawText": ""
 }`
 
-  const raw = await callOpenAI(apiKey, system, user, 0.1, model)
+  const raw = await callAI(config, system, user, 0.1)
   try {
     return { ...JSON.parse(raw), rawText: jobText }
   } catch {
@@ -239,11 +194,10 @@ Return this exact JSON:
 // ─── Stage 3: Optimize Resume with AI ────────────────────────────────────────
 
 export async function optimizeResumeWithAI(
-  apiKey: string,
+  config: AIConfig,
   resumeData: ResumeData,
   jobData: JobDescriptionData | null,
   missingKeywords: string[],
-  model: string = DEFAULT_MODEL,
 ): Promise<OptimizedResume> {
   const { detectResumeType, getSectionOrder } = await import('./resumeTypeDetector')
   const profile = detectResumeType(resumeData)
@@ -311,7 +265,7 @@ RETURN this exact JSON (no markdown):
   }
 }`
 
-  const raw = await callOpenAI(apiKey, system, user, 0.3, model)
+  const raw = await callAI(config, system, user, 0.3)
   try {
     const parsed = JSON.parse(raw)
     return { ...parsed, structuredData: { ...parsed.structuredData, rawText: resumeData.rawText } } as OptimizedResume
@@ -457,10 +411,9 @@ function improveBullet(bullet: string, changes: OptimizationChange[]): string {
 // ─── Stage 5: Cover Letter Generation ────────────────────────────────────────
 
 export async function generateCoverLetterWithAI(
-  apiKey: string,
+  config: AIConfig,
   resumeData: ResumeData,
   jobData: JobDescriptionData,
-  model: string = DEFAULT_MODEL,
 ): Promise<string> {
   const system = `You are a master cover letter writer combining expertise from Harvard OCS and professional recruiting.
 ${ATS_EXPERTISE}
@@ -499,5 +452,5 @@ Key Responsibilities: ${jobData.responsibilities.slice(0, 5).join(' | ')}
 
 Write the complete cover letter now (no brackets, no placeholders):`
 
-  return callOpenAI(apiKey, system, user, 0.6, model)
+  return callAI(config, system, user, 0.6)
 }

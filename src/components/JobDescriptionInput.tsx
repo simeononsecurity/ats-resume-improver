@@ -4,28 +4,30 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import type { JobDescriptionData } from '@/types'
+import type { AIConfig } from '@/lib/aiProvider'
 
 interface JobDescriptionInputProps {
-  apiKey: string
-  aiModel?: string
+  aiConfig: AIConfig
   resumeRawText?: string
   onAnalyzed: (jobData: JobDescriptionData) => void
   jobData: JobDescriptionData | null
 }
 
-export function JobDescriptionInput({ apiKey, aiModel, resumeRawText, onAnalyzed, jobData }: JobDescriptionInputProps) {
+export function JobDescriptionInput({ aiConfig, resumeRawText, onAnalyzed, jobData }: JobDescriptionInputProps) {
   const [text, setText] = useState(jobData?.rawText ?? '')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const hasAI = aiConfig.provider === 'ollama' || !!aiConfig.apiKey
 
   const handleAnalyze = async () => {
     if (!text.trim()) return
     setError('')
     setIsLoading(true)
     try {
-      if (apiKey) {
+      if (hasAI) {
         const { parseJobDescriptionWithAI } = await import('@/lib/openaiService')
-        const result = await parseJobDescriptionWithAI(apiKey, text, resumeRawText, aiModel)
+        const result = await parseJobDescriptionWithAI(aiConfig, text, resumeRawText)
         onAnalyzed(result)
       } else {
         const { parseJobDescriptionLocal } = await import('@/lib/keywordMatcher')
@@ -84,11 +86,15 @@ export function JobDescriptionInput({ apiKey, aiModel, resumeRawText, onAnalyzed
                 className="flex-1"
               >
                 {!isLoading && <Wand2 className="w-4 h-4" />}
-                {isLoading ? 'Analyzing...' : apiKey ? 'Analyze with AI' : 'Analyze Keywords'}
+                {isLoading
+                  ? 'Analyzing...'
+                  : hasAI
+                  ? `Analyze with ${aiConfig.provider === 'ollama' ? '🦙 Ollama' : aiConfig.provider === 'anthropic' ? 'Claude' : 'GPT'}`
+                  : 'Analyze Keywords'}
               </Button>
-              {!apiKey && (
+              {!hasAI && (
                 <span className="text-xs text-slate-500">
-                  Add an API key for deeper AI analysis
+                  Configure an AI provider for deeper analysis
                 </span>
               )}
             </div>

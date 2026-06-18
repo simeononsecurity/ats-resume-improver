@@ -1,3 +1,5 @@
+import type { AIConfig } from '../lib/aiProvider'
+
 export interface ResumeData {
   name: string
   email: string
@@ -76,8 +78,7 @@ export interface OptimizedResume {
 
 export interface AppState {
   step: AppStep
-  apiKey: string
-  aiModel: string
+  aiConfig: AIConfig
   resumeRawText: string
   resumeData: ResumeData | null
   jobDescription: string

@@ -4,10 +4,10 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import type { ResumeData, JobDescriptionData } from '@/types'
+import type { AIConfig } from '@/lib/aiProvider'
 
 interface CoverLetterGeneratorProps {
-  apiKey: string
-  aiModel?: string
+  aiConfig: AIConfig
   resumeData: ResumeData
   jobData: JobDescriptionData | null
   coverLetter: string
@@ -15,8 +15,7 @@ interface CoverLetterGeneratorProps {
 }
 
 export function CoverLetterGenerator({
-  apiKey,
-  aiModel,
+  aiConfig,
   resumeData,
   jobData,
   coverLetter,
@@ -26,9 +25,18 @@ export function CoverLetterGenerator({
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
 
+  const hasAI = aiConfig.provider === 'ollama' || !!aiConfig.apiKey
+
+  const providerLabel =
+    aiConfig.provider === 'ollama'
+      ? '🦙 Ollama'
+      : aiConfig.provider === 'anthropic'
+      ? 'Claude'
+      : 'GPT'
+
   const handleGenerate = async () => {
-    if (!apiKey) {
-      setError('OpenAI API key required to generate a cover letter.')
+    if (!hasAI) {
+      setError('Configure an AI provider to generate a cover letter.')
       return
     }
     if (!jobData) {
@@ -39,7 +47,7 @@ export function CoverLetterGenerator({
     setIsLoading(true)
     try {
       const { generateCoverLetterWithAI } = await import('@/lib/openaiService')
-      const result = await generateCoverLetterWithAI(apiKey, resumeData, jobData, aiModel)
+      const result = await generateCoverLetterWithAI(aiConfig, resumeData, jobData)
       onGenerated(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Cover letter generation failed.')
@@ -71,17 +79,19 @@ export function CoverLetterGenerator({
       {/* Requirements check */}
       <div className="grid md:grid-cols-2 gap-3">
         <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
-          apiKey ? 'border-emerald-500/30 bg-emerald-600/5' : 'border-[#2e3347] bg-[#1a1d27]'
+          hasAI ? 'border-emerald-500/30 bg-emerald-600/5' : 'border-[#2e3347] bg-[#1a1d27]'
         }`}>
-          <Mail className={`w-4 h-4 ${apiKey ? 'text-emerald-400' : 'text-slate-600'}`} />
+          <Mail className={`w-4 h-4 ${hasAI ? 'text-emerald-400' : 'text-slate-600'}`} />
           <div>
-            <p className={`text-sm font-medium ${apiKey ? 'text-emerald-300' : 'text-slate-500'}`}>
-              OpenAI API Key
+            <p className={`text-sm font-medium ${hasAI ? 'text-emerald-300' : 'text-slate-500'}`}>
+              AI Provider
             </p>
-            <p className="text-xs text-slate-600">{apiKey ? 'Connected' : 'Required'}</p>
+            <p className="text-xs text-slate-600">
+              {hasAI ? `${providerLabel} — ${aiConfig.model}` : 'Required'}
+            </p>
           </div>
-          <Badge variant={apiKey ? 'success' : 'muted'} className="ml-auto">
-            {apiKey ? '✓' : 'Missing'}
+          <Badge variant={hasAI ? 'success' : 'muted'} className="ml-auto">
+            {hasAI ? '✓' : 'Missing'}
           </Badge>
         </div>
 
@@ -128,19 +138,19 @@ export function CoverLetterGenerator({
               <Button
                 onClick={handleGenerate}
                 loading={isLoading}
-                disabled={!apiKey || !jobData}
+                disabled={!hasAI || !jobData}
                 size="lg"
               >
                 {!isLoading && <Wand2 className="w-5 h-5" />}
-                {isLoading ? 'Generating...' : 'Generate Cover Letter'}
+                {isLoading ? 'Generating...' : `Generate with ${providerLabel}`}
               </Button>
 
-              {!apiKey && (
+              {!hasAI && (
                 <p className="text-xs text-slate-600">
-                  Add your OpenAI API key to enable cover letter generation
+                  Configure an AI provider in the sidebar to enable cover letter generation
                 </p>
               )}
-              {apiKey && !jobData && (
+              {hasAI && !jobData && (
                 <p className="text-xs text-slate-600">
                   Add a job description above to generate a tailored cover letter
                 </p>

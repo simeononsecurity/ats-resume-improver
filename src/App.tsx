@@ -19,14 +19,15 @@ import { CoverLetterGenerator } from '@/components/CoverLetterGenerator'
 import type { AppState, AppStep, ResumeData, JobDescriptionData, OptimizedResume } from '@/types'
 import { scoreResume } from '@/lib/atsAnalyzer'
 import { analyzeKeywords } from '@/lib/keywordMatcher'
-import { parseResumeLocal, DEFAULT_MODEL } from '@/lib/openaiService'
+import { parseResumeLocal } from '@/lib/openaiService'
+import { DEFAULT_AI_CONFIG } from '@/lib/aiProvider'
+import type { AIConfig } from '@/lib/aiProvider'
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
 const initialState: AppState = {
   step: 'upload',
-  apiKey: '',
-  aiModel: DEFAULT_MODEL,
+  aiConfig: DEFAULT_AI_CONFIG,
   resumeRawText: '',
   resumeData: null,
   jobDescription: '',
@@ -41,8 +42,7 @@ const initialState: AppState = {
 }
 
 type Action =
-  | { type: 'SET_API_KEY'; payload: string }
-  | { type: 'SET_AI_MODEL'; payload: string }
+  | { type: 'SET_AI_CONFIG'; payload: AIConfig }
   | { type: 'SET_RESUME'; payload: { rawText: string; fileName: string } }
   | { type: 'SET_RESUME_DATA'; payload: ResumeData }
   | { type: 'SET_JOB_DATA'; payload: JobDescriptionData }
@@ -55,11 +55,8 @@ type Action =
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
-    case 'SET_API_KEY':
-      return { ...state, apiKey: action.payload }
-
-    case 'SET_AI_MODEL':
-      return { ...state, aiModel: action.payload }
+    case 'SET_AI_CONFIG':
+      return { ...state, aiConfig: action.payload }
 
     case 'SET_RESUME': {
       const resumeData: ResumeData = parseResumeLocal(action.payload.rawText)
@@ -134,18 +131,21 @@ export default function App() {
     dispatch({ type: 'SET_STEP', payload: step })
   }, [])
 
+  // Derived: AI is active if using Ollama (no key needed) or a key is set
+  const hasAI = state.aiConfig.provider === 'ollama' || !!state.aiConfig.apiKey
+
   const handleResumeParsed = useCallback((rawText: string, _fileName: string) => {
     dispatch({ type: 'SET_RESUME', payload: { rawText, fileName: _fileName } })
-    if (state.apiKey) {
+    if (hasAI) {
       ;(async () => {
         try {
           const { parseResumeWithAI } = await import('@/lib/openaiService')
-          const data = await parseResumeWithAI(state.apiKey, rawText, state.aiModel)
+          const data = await parseResumeWithAI(state.aiConfig, rawText)
           dispatch({ type: 'SET_RESUME_DATA', payload: data })
-        } catch { /* silently fail */ }
+        } catch { /* silently fail — local parse already ran */ }
       })()
     }
-  }, [state.apiKey])
+  }, [state.aiConfig, hasAI])
 
   const currentStepIndex = STEPS.findIndex(s => s.id === state.step)
   const hasResume = !!state.resumeRawText
@@ -165,13 +165,17 @@ export default function App() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {state.apiKey ? (
+              {hasAI ? (
                 <div className="hidden md:flex items-center gap-1.5 text-xs text-emerald-400">
-                  <ShieldCheck className="w-3.5 h-3.5" />AI Active
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  AI Active
+                  <span className="text-emerald-600">
+                    ({state.aiConfig.provider === 'ollama' ? '🦙' : state.aiConfig.provider === 'anthropic' ? 'Claude' : 'GPT'})
+                  </span>
                 </div>
               ) : (
                 <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-500">
-                  <KeyRound className="w-3.5 h-3.5" />No API key
+                  <KeyRound className="w-3.5 h-3.5" />No AI key
                 </div>
               )}
               {hasResume && (
@@ -214,10 +218,8 @@ export default function App() {
             })}
             <div className="mt-4 pt-4 border-t border-[#2e3347]">
               <ApiKeySetup
-                apiKey={state.apiKey}
-                onSave={key => dispatch({ type: 'SET_API_KEY', payload: key })}
-                selectedModel={state.aiModel}
-                onModelChange={m => dispatch({ type: 'SET_AI_MODEL', payload: m })}
+                aiConfig={state.aiConfig}
+                onSave={(config) => dispatch({ type: 'SET_AI_CONFIG', payload: config })}
               />
             </div>
           </aside>
@@ -252,10 +254,8 @@ export default function App() {
               <StepWrapper title="Upload Your Resume" subtitle="Start by uploading your resume. We'll extract and analyze the text instantly." icon={<Upload className="w-5 h-5 text-indigo-400" />}>
                 <div className="lg:hidden mb-6">
                   <ApiKeySetup
-                    apiKey={state.apiKey}
-                    onSave={key => dispatch({ type: 'SET_API_KEY', payload: key })}
-                    selectedModel={state.aiModel}
-                    onModelChange={m => dispatch({ type: 'SET_AI_MODEL', payload: m })}
+                    aiConfig={state.aiConfig}
+                    onSave={(config) => dispatch({ type: 'SET_AI_CONFIG', payload: config })}
                   />
                 </div>
                 <ResumeUpload onParsed={handleResumeParsed} isLoading={state.isLoading} />
@@ -284,7 +284,7 @@ export default function App() {
             {/* Job Description */}
             {state.step === 'job-description' && hasResume && (
               <StepWrapper title="Job Description" subtitle="Paste the job posting to unlock keyword gap analysis and targeted optimization." icon={<Briefcase className="w-5 h-5 text-cyan-400" />} nextStep={() => setStep('analysis')} nextLabel="View Analysis →" skipStep={() => setStep('optimize')} skipLabel="Skip to Optimize">
-                <JobDescriptionInput apiKey={state.apiKey} aiModel={state.aiModel} resumeRawText={state.resumeRawText} onAnalyzed={jd => dispatch({ type: 'SET_JOB_DATA', payload: jd })} jobData={state.jobData} />
+                <JobDescriptionInput aiConfig={state.aiConfig} resumeRawText={state.resumeRawText} onAnalyzed={jd => dispatch({ type: 'SET_JOB_DATA', payload: jd })} jobData={state.jobData} />
               </StepWrapper>
             )}
 
@@ -317,8 +317,14 @@ export default function App() {
 
             {/* Optimize */}
             {state.step === 'optimize' && hasResume && state.resumeData && (
-              <StepWrapper title="Optimize Resume" subtitle={state.apiKey ? 'AI-powered optimization using GPT-4o' : 'Deterministic ATS optimization (no API key needed)'} icon={<Wand2 className="w-5 h-5 text-indigo-400" />} nextStep={state.optimizedResume ? () => setStep('diff') : undefined} nextLabel="View Changes →">
-                <ResumeOptimizer apiKey={state.apiKey} aiModel={state.aiModel} resumeData={state.resumeData} jobData={state.jobData} keywordAnalysis={state.keywordAnalysis} optimizedResume={state.optimizedResume} onOptimized={result => dispatch({ type: 'SET_OPTIMIZED', payload: result })} />
+              <StepWrapper
+                title="Optimize Resume"
+                subtitle={hasAI ? `AI-powered optimization (${state.aiConfig.provider === 'ollama' ? '🦙 Ollama' : state.aiConfig.provider === 'anthropic' ? 'Claude' : 'GPT'} · ${state.aiConfig.model})` : 'Deterministic ATS optimization (no AI configured)'}
+                icon={<Wand2 className="w-5 h-5 text-indigo-400" />}
+                nextStep={state.optimizedResume ? () => setStep('diff') : undefined}
+                nextLabel="View Changes →"
+              >
+                <ResumeOptimizer aiConfig={state.aiConfig} resumeData={state.resumeData} jobData={state.jobData} keywordAnalysis={state.keywordAnalysis} optimizedResume={state.optimizedResume} onOptimized={result => dispatch({ type: 'SET_OPTIMIZED', payload: result })} />
               </StepWrapper>
             )}
 
@@ -328,7 +334,7 @@ export default function App() {
                 <DiffViewer
                   original={state.resumeRawText}
                   optimized={state.optimizedResume}
-                  apiKey={state.apiKey || undefined}
+                  aiConfig={hasAI ? state.aiConfig : undefined}
                   resumeData={state.resumeData ?? undefined}
                 />
               </StepWrapper>
@@ -341,13 +347,13 @@ export default function App() {
                   <ExportOptions
                     optimizedResume={state.optimizedResume}
                     resumeData={state.resumeData}
-                    apiKey={state.apiKey || undefined}
+                    aiConfig={hasAI ? state.aiConfig : undefined}
                   />
                   <div>
                     <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider flex items-center gap-2">
                       <Mail className="w-4 h-4" />Cover Letter
                     </h3>
-                    <CoverLetterGenerator apiKey={state.apiKey} aiModel={state.aiModel} resumeData={state.resumeData} jobData={state.jobData} coverLetter={state.coverLetter} onGenerated={letter => dispatch({ type: 'SET_COVER_LETTER', payload: letter })} />
+                    <CoverLetterGenerator aiConfig={state.aiConfig} resumeData={state.resumeData} jobData={state.jobData} coverLetter={state.coverLetter} onGenerated={letter => dispatch({ type: 'SET_COVER_LETTER', payload: letter })} />
                   </div>
                 </div>
               </StepWrapper>

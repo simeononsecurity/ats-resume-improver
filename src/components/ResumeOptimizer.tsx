@@ -4,10 +4,10 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import type { ResumeData, JobDescriptionData, OptimizedResume, KeywordAnalysis } from '@/types'
+import type { AIConfig } from '@/lib/aiProvider'
 
 interface ResumeOptimizerProps {
-  apiKey: string
-  aiModel?: string
+  aiConfig: AIConfig
   resumeData: ResumeData
   jobData: JobDescriptionData | null
   keywordAnalysis: KeywordAnalysis | null
@@ -16,8 +16,7 @@ interface ResumeOptimizerProps {
 }
 
 export function ResumeOptimizer({
-  apiKey,
-  aiModel,
+  aiConfig,
   resumeData,
   jobData,
   keywordAnalysis,
@@ -28,14 +27,23 @@ export function ResumeOptimizer({
   const [error, setError] = useState('')
   const [showChanges, setShowChanges] = useState(false)
 
+  const hasAI = aiConfig.provider === 'ollama' || !!aiConfig.apiKey
+
+  const providerLabel =
+    aiConfig.provider === 'ollama'
+      ? '🦙 Ollama'
+      : aiConfig.provider === 'anthropic'
+      ? 'Claude'
+      : 'GPT'
+
   const handleOptimize = async () => {
     setError('')
     setIsLoading(true)
     try {
       const missingKeywords = keywordAnalysis?.missing ?? []
-      if (apiKey) {
+      if (hasAI) {
         const { optimizeResumeWithAI } = await import('@/lib/openaiService')
-        const result = await optimizeResumeWithAI(apiKey, resumeData, jobData, missingKeywords, aiModel)
+        const result = await optimizeResumeWithAI(aiConfig, resumeData, jobData, missingKeywords)
         onOptimized(result)
       } else {
         const { optimizeResumeLocal } = await import('@/lib/openaiService')
@@ -57,7 +65,7 @@ export function ResumeOptimizer({
           <CardContent>
             <div className="text-center space-y-4 py-4">
               <div className="inline-flex p-4 rounded-2xl bg-indigo-600/20 border border-indigo-500/30">
-                {apiKey ? (
+                {hasAI ? (
                   <Wand2 className="w-8 h-8 text-indigo-400" />
                 ) : (
                   <Zap className="w-8 h-8 text-amber-400" />
@@ -66,12 +74,12 @@ export function ResumeOptimizer({
 
               <div>
                 <h3 className="text-lg font-semibold text-slate-200 mb-2">
-                  {apiKey ? 'AI-Powered Resume Optimization' : 'Deterministic ATS Optimization'}
+                  {hasAI ? `AI-Powered Resume Optimization (${providerLabel})` : 'Deterministic ATS Optimization'}
                 </h3>
                 <p className="text-sm text-slate-400 max-w-md mx-auto">
-                  {apiKey
-                    ? 'GPT-4o will analyze your resume, fix weak bullet points, incorporate missing keywords naturally, and generate both an ATS-friendly and tailored version.'
-                    : 'Without an API key, we\'ll apply deterministic rules: normalize formatting, strengthen action verbs, and structure your resume for ATS compatibility.'}
+                  {hasAI
+                    ? `${providerLabel} will analyze your resume, fix weak bullet points, incorporate missing keywords naturally, and generate both an ATS-friendly and tailored version.`
+                    : "Without an AI provider configured, we'll apply deterministic rules: normalize formatting, strengthen action verbs, and structure your resume for ATS compatibility."}
                 </p>
               </div>
 
@@ -101,17 +109,17 @@ export function ResumeOptimizer({
                 size="lg"
                 className="min-w-48"
               >
-                {!isLoading && (apiKey ? <Wand2 className="w-5 h-5" /> : <Zap className="w-5 h-5" />)}
+                {!isLoading && (hasAI ? <Wand2 className="w-5 h-5" /> : <Zap className="w-5 h-5" />)}
                 {isLoading
                   ? 'Optimizing...'
-                  : apiKey
-                  ? 'Optimize with AI'
+                  : hasAI
+                  ? `Optimize with ${providerLabel}`
                   : 'Optimize Resume'}
               </Button>
 
-              {!apiKey && (
+              {!hasAI && (
                 <p className="text-xs text-slate-600">
-                  Add an OpenAI API key at the top for AI-powered keyword integration
+                  Configure an AI provider in the sidebar for AI-powered keyword integration
                 </p>
               )}
             </div>
@@ -129,21 +137,9 @@ export function ResumeOptimizer({
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-3 gap-3 mb-4">
-                <StatItem
-                  label="Changes Made"
-                  value={optimizedResume.changes.length.toString()}
-                  color="indigo"
-                />
-                <StatItem
-                  label="ATS Version"
-                  value="Ready"
-                  color="emerald"
-                />
-                <StatItem
-                  label="Tailored Version"
-                  value={jobData ? 'Ready' : 'N/A'}
-                  color="cyan"
-                />
+                <StatItem label="Changes Made" value={optimizedResume.changes.length.toString()} color="indigo" />
+                <StatItem label="ATS Version" value="Ready" color="emerald" />
+                <StatItem label="Tailored Version" value={jobData ? 'Ready' : 'N/A'} color="cyan" />
               </div>
 
               {optimizedResume.changes.length > 0 && (

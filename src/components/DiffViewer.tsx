@@ -4,18 +4,19 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import type { OptimizedResume, ResumeData } from '@/types'
+import type { AIConfig } from '@/lib/aiProvider'
 
 interface DiffViewerProps {
   original: string
   optimized: OptimizedResume
-  apiKey?: string
+  aiConfig?: AIConfig
   resumeData?: ResumeData
 }
 
 type ViewMode = 'side-by-side' | 'ats' | 'tailored'
 type ExportFormat = 'pdf' | 'docx' | 'txt'
 
-export function DiffViewer({ original, optimized, apiKey, resumeData }: DiffViewerProps) {
+export function DiffViewer({ original, optimized, aiConfig, resumeData }: DiffViewerProps) {
   const [mode, setMode] = useState<ViewMode>('side-by-side')
   const [copied, setCopied] = useState<string | null>(null)
   const [exporting, setExporting] = useState<ExportFormat | null>(null)
@@ -39,6 +40,8 @@ export function DiffViewer({ original, optimized, apiKey, resumeData }: DiffView
   const getStructuredData = (): ResumeData | undefined =>
     resumeData ?? optimized.structuredData ?? undefined
 
+  const hasAI = !!aiConfig && (aiConfig.provider === 'ollama' || !!aiConfig.apiKey)
+
   const handleExport = async (format: ExportFormat) => {
     setExporting(format)
     try {
@@ -46,10 +49,10 @@ export function DiffViewer({ original, optimized, apiKey, resumeData }: DiffView
       const content = getActiveContent()
       const data = getStructuredData()
 
-      if (apiKey && data) {
+      if (hasAI && aiConfig && data) {
         // AI-enhanced export: formats with AI then renders beautifully
         const { exportWithAI } = await import('@/lib/exportService')
-        await exportWithAI(apiKey, data, format, content, fileName)
+        await exportWithAI(aiConfig, data, format, content, fileName)
       } else {
         // Direct export with improved templates
         const { exportPDF, exportDOCX, exportTXT } = await import('@/lib/exportService')
@@ -98,7 +101,7 @@ export function DiffViewer({ original, optimized, apiKey, resumeData }: DiffView
       {/* Download bar */}
       <div className="flex items-center gap-2 flex-wrap bg-[#1a1d27] border border-[#2e3347] rounded-xl px-4 py-3">
         <div className="flex items-center gap-1.5 mr-2">
-          {apiKey ? (
+          {hasAI ? (
             <>
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
               <span className="text-xs text-indigo-400 font-medium">AI-Enhanced</span>
@@ -110,7 +113,7 @@ export function DiffViewer({ original, optimized, apiKey, resumeData }: DiffView
         <ExportBtn format="pdf" label="PDF" icon={<File className="w-3.5 h-3.5 text-red-400" />} />
         <ExportBtn format="docx" label="DOCX" icon={<FileText className="w-3.5 h-3.5 text-blue-400" />} />
         <ExportBtn format="txt" label="TXT" icon={<Download className="w-3.5 h-3.5 text-slate-400" />} />
-        {apiKey && (
+        {hasAI && (
           <span className="text-xs text-slate-600 ml-1">AI formats & validates before downloading</span>
         )}
       </div>

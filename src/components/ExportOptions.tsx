@@ -4,11 +4,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import type { OptimizedResume, ResumeData } from '@/types'
+import type { AIConfig } from '@/lib/aiProvider'
 
 interface ExportOptionsProps {
   optimizedResume: OptimizedResume
   resumeData: ResumeData
-  apiKey?: string
+  aiConfig?: AIConfig
 }
 
 type Format = 'pdf' | 'docx' | 'txt' | 'md'
@@ -37,7 +38,7 @@ const FORMAT_INFO: Record<Format, { label: string; icon: React.ReactNode; descri
   },
 }
 
-export function ExportOptions({ optimizedResume, resumeData, apiKey }: ExportOptionsProps) {
+export function ExportOptions({ optimizedResume, resumeData, aiConfig }: ExportOptionsProps) {
   const [selectedFormat, setSelectedFormat] = useState<Format>('pdf')
   const [selectedVersion, setSelectedVersion] = useState<Version>('ats')
   const [loading, setLoading] = useState(false)
@@ -53,6 +54,8 @@ export function ExportOptions({ optimizedResume, resumeData, apiKey }: ExportOpt
     return `${name}-${selectedVersion}.${ext}`
   }
 
+  const hasAI = !!aiConfig && (aiConfig.provider === 'ollama' || !!aiConfig.apiKey)
+
   const handleExport = async () => {
     setLoading(true)
     setSuccess(false)
@@ -61,10 +64,10 @@ export function ExportOptions({ optimizedResume, resumeData, apiKey }: ExportOpt
       const data = getStructuredData()
       const fileName = getFileName(selectedFormat)
 
-      if (apiKey && selectedFormat !== 'md') {
+      if (hasAI && aiConfig && selectedFormat !== 'md') {
         // AI-enhanced: ask AI to format perfectly before rendering
         const { exportWithAI } = await import('@/lib/exportService')
-        await exportWithAI(apiKey, data, selectedFormat as 'pdf' | 'docx' | 'txt', content, fileName)
+        await exportWithAI(aiConfig, data, selectedFormat as 'pdf' | 'docx' | 'txt', content, fileName)
       } else {
         const { exportTXT, exportMarkdown, exportPDF, exportDOCX } = await import('@/lib/exportService')
         switch (selectedFormat) {
@@ -86,7 +89,7 @@ export function ExportOptions({ optimizedResume, resumeData, apiKey }: ExportOpt
   return (
     <div className="space-y-4 animate-fade-in">
       {/* AI indicator */}
-      {apiKey && (
+      {hasAI && (
         <div className="flex items-center gap-2 bg-indigo-600/10 border border-indigo-500/30 rounded-xl px-4 py-2.5">
           <Sparkles className="w-4 h-4 text-indigo-400" />
           <p className="text-xs text-indigo-300">
@@ -152,7 +155,7 @@ export function ExportOptions({ optimizedResume, resumeData, apiKey }: ExportOpt
               <p className="text-sm font-medium text-slate-200">
                 Export as <span className="text-indigo-400">.{selectedFormat.toUpperCase()}</span>
                 {' — '}<span className="text-cyan-400">{selectedVersion === 'ats' ? 'ATS' : 'Tailored'} version</span>
-                {apiKey && selectedFormat !== 'md' && <span className="text-indigo-400/70"> (AI-formatted)</span>}
+                {hasAI && selectedFormat !== 'md' && <span className="text-indigo-400/70"> (AI-formatted)</span>}
               </p>
               <p className="text-xs text-slate-500 mt-0.5">File: {getFileName(selectedFormat)}</p>
             </div>
