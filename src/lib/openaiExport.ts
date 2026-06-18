@@ -14,6 +14,12 @@ export async function callOpenAIForExport(
   const system = `You are a professional resume formatter specializing in ATS-optimized plain-text resumes.
 Your task is to take an optimized resume and produce a PERFECTLY formatted plain-text version for export.
 
+HONESTY RULES (absolute — override everything else):
+• Do NOT add, invent, or change any factual content
+• No new certifications, skills, companies, degrees, or dates may be introduced
+• Your role is FORMATTING ONLY: clean up whitespace, standardize headers, fix bullet formatting
+• Every word of substance must come from the provided resume text — nothing more
+
 ATS FORMATTING REQUIREMENTS:
 • Name on first line — ALL CAPS
 • Contact info on second line (email | phone | location)

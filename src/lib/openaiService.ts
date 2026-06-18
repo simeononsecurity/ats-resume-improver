@@ -13,6 +13,16 @@ const ATS_EXPERTISE = `
 You are an expert ATS resume strategist trained on best practices from Harvard OCS, Columbia CCE, and 
 industry consensus. Apply these rules in every response:
 
+HONESTY AND ACCURACY RULES (absolute — override everything else):
+• NEVER invent, fabricate, or assume any certification, degree, job title, company, date, or credential
+• NEVER add skills, tools, technologies, or experiences the candidate has not already stated in their source resume
+• NEVER inflate tenure, change employment dates, or create experience entries that do not exist
+• NEVER add a keyword from the job description unless the candidate's existing resume already demonstrates that skill
+• Your ONLY job is to REWRITE and REFRAME what is already present: stronger verbs, clearer structure, better phrasing
+• Rewriting a bullet is allowed. Inventing the content of that bullet is not.
+• If a required keyword cannot be supported by the candidate's actual experience, leave it out entirely
+• Adding false credentials causes direct, real-world harm: it fails background checks, kills job offers, and ends careers
+
 ATS FORMATTING RULES (non-negotiable):
 • Single-column layout only — no tables, columns, text boxes, headers, footers, or graphics
 • Section headings in ALL CAPS: PROFESSIONAL SUMMARY, PROFESSIONAL EXPERIENCE, EDUCATION, SKILLS, CERTIFICATIONS
@@ -224,9 +234,14 @@ OPTIMIZATION PRIORITIES:
 6. Add metrics to vague bullets where the original implies scale
 7. Ensure ATS formatting: ALL CAPS section headers, no tables, single column
 
-CONSTRAINTS:
-• PRESERVE every job, company, title, date, degree — no factual changes
-• Do NOT fabricate experience, skills, certifications, or companies
+CONSTRAINTS (non-negotiable — these override all optimization goals):
+• PRESERVE every job title, company name, date, degree, and certification exactly as written
+• NEVER add a certification, degree, or credential the candidate did not list
+• NEVER invent a job, project, or skill the candidate did not mention
+• NEVER add a keyword from the job description to the candidate's skills unless it already appears in their resume
+• You may rephrase a bullet point but you may NOT change what actually happened
+• You may quantify an implied scale (e.g. "large team" → "team of ~20") but must not fabricate specific numbers
+• If a keyword gap cannot be filled honestly, leave it unfilled — gaps are better than lies
 • Output must be COMPLETE — every section with ALL original content
 • Return ONLY valid JSON — no markdown fences, no comments`
 
@@ -427,7 +442,8 @@ COVER LETTER RULES:
 • Use EXACT keywords from the job description naturally woven in
 • Never use: "I believe I would be a great fit", "I am a quick learner", "I am passionate"
 • Professional salutation: "Dear [Name]:" or "Dear Hiring Manager:" — never "To Whom It May Concern"
-• Do NOT write [placeholder] brackets or generic fillers — write the actual letter`
+• Do NOT write [placeholder] brackets or generic fillers — write the actual letter
+• HONESTY: Every achievement, skill, and technology mentioned must come from the candidate's actual resume — never invent experience to fill a gap in the job requirements`
 
   const user = `Write a tailored cover letter for this specific application.
 
