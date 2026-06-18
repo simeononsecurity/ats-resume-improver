@@ -1,0 +1,30 @@
+services:
+  # ─── Development ─────────────────────────────────────────────────────────────
+  dev:
+    build:
+      context: .
+      target: dev
+    image: ats-resume-improver:dev
+    container_name: ats-resume-dev
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source for hot-reload — node_modules stays in the container
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    restart: unless-stopped
+
+  # ─── Production ──────────────────────────────────────────────────────────────
+  prod:
+    build:
+      context: .
+      target: prod
+    image: ats-resume-improver:prod
+    container_name: ats-resume-prod
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
