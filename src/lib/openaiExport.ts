@@ -1,7 +1,6 @@
 import type { ResumeData } from '../types'
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
-const MODEL = 'gpt-4o-mini'
 
 /**
  * Ask AI to produce a clean, professionally formatted plain-text version of the resume
@@ -10,7 +9,8 @@ const MODEL = 'gpt-4o-mini'
 export async function callOpenAIForExport(
   apiKey: string,
   resumeData: ResumeData,
-  currentVersion: string
+  currentVersion: string,
+  model = 'gpt-4o-mini'
 ): Promise<string> {
   const system = `You are a professional resume formatter specializing in ATS-optimized plain-text resumes.
 Your task is to take an optimized resume and produce a PERFECTLY formatted plain-text version for export.
@@ -55,7 +55,7 @@ Output the complete formatted resume now:`
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       temperature: 0.1,
       messages: [
         { role: 'system', content: system },

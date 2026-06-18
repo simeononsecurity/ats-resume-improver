@@ -7,12 +7,13 @@ import type { JobDescriptionData } from '@/types'
 
 interface JobDescriptionInputProps {
   apiKey: string
+  aiModel?: string
   resumeRawText?: string
   onAnalyzed: (jobData: JobDescriptionData) => void
   jobData: JobDescriptionData | null
 }
 
-export function JobDescriptionInput({ apiKey, resumeRawText, onAnalyzed, jobData }: JobDescriptionInputProps) {
+export function JobDescriptionInput({ apiKey, aiModel, resumeRawText, onAnalyzed, jobData }: JobDescriptionInputProps) {
   const [text, setText] = useState(jobData?.rawText ?? '')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -24,7 +25,7 @@ export function JobDescriptionInput({ apiKey, resumeRawText, onAnalyzed, jobData
     try {
       if (apiKey) {
         const { parseJobDescriptionWithAI } = await import('@/lib/openaiService')
-        const result = await parseJobDescriptionWithAI(apiKey, text, resumeRawText)
+        const result = await parseJobDescriptionWithAI(apiKey, text, resumeRawText, aiModel)
         onAnalyzed(result)
       } else {
         const { parseJobDescriptionLocal } = await import('@/lib/keywordMatcher')

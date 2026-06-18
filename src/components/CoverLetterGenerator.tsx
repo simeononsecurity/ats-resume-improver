@@ -7,6 +7,7 @@ import type { ResumeData, JobDescriptionData } from '@/types'
 
 interface CoverLetterGeneratorProps {
   apiKey: string
+  aiModel?: string
   resumeData: ResumeData
   jobData: JobDescriptionData | null
   coverLetter: string
@@ -15,6 +16,7 @@ interface CoverLetterGeneratorProps {
 
 export function CoverLetterGenerator({
   apiKey,
+  aiModel,
   resumeData,
   jobData,
   coverLetter,
@@ -37,7 +39,7 @@ export function CoverLetterGenerator({
     setIsLoading(true)
     try {
       const { generateCoverLetterWithAI } = await import('@/lib/openaiService')
-      const result = await generateCoverLetterWithAI(apiKey, resumeData, jobData)
+      const result = await generateCoverLetterWithAI(apiKey, resumeData, jobData, aiModel)
       onGenerated(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Cover letter generation failed.')

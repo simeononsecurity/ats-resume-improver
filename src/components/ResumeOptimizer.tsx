@@ -7,6 +7,7 @@ import type { ResumeData, JobDescriptionData, OptimizedResume, KeywordAnalysis }
 
 interface ResumeOptimizerProps {
   apiKey: string
+  aiModel?: string
   resumeData: ResumeData
   jobData: JobDescriptionData | null
   keywordAnalysis: KeywordAnalysis | null
@@ -16,6 +17,7 @@ interface ResumeOptimizerProps {
 
 export function ResumeOptimizer({
   apiKey,
+  aiModel,
   resumeData,
   jobData,
   keywordAnalysis,
@@ -33,7 +35,7 @@ export function ResumeOptimizer({
       const missingKeywords = keywordAnalysis?.missing ?? []
       if (apiKey) {
         const { optimizeResumeWithAI } = await import('@/lib/openaiService')
-        const result = await optimizeResumeWithAI(apiKey, resumeData, jobData, missingKeywords)
+        const result = await optimizeResumeWithAI(apiKey, resumeData, jobData, missingKeywords, aiModel)
         onOptimized(result)
       } else {
         const { optimizeResumeLocal } = await import('@/lib/openaiService')

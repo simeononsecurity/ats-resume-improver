@@ -1,8 +1,12 @@
 # ATS Resume Match — AI Career Intelligence
 
-> Free, self-hostable ATS resume optimizer. 100% client-side. No backend. Your data never leaves your browser.
+> Self-hostable ATS resume optimizer. All parsing & scoring runs in your browser — AI features optionally call OpenAI using your own key.
 
-![ATS Resume Match](https://img.shields.io/badge/self--hostable-yes-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Tech](https://img.shields.io/badge/stack-React%20%2B%20Vite%20%2B%20TypeScript-indigo) ![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
+[![GitHub Stars](https://img.shields.io/github/stars/simeononsecurity/ats-resume-improver?style=flat)](https://github.com/simeononsecurity/ats-resume-improver/stargazers)
+[![GitHub Actions](https://github.com/simeononsecurity/ats-resume-improver/actions/workflows/deploy.yml/badge.svg)](https://github.com/simeononsecurity/ats-resume-improver/actions)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Tech](https://img.shields.io/badge/stack-React%20%2B%20Vite%20%2B%20TypeScript-indigo)](https://github.com/simeononsecurity/ats-resume-improver)
+[![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)](https://github.com/simeononsecurity/ats-resume-improver/blob/main/Dockerfile)
 
 ## ✨ Features
 
@@ -15,73 +19,77 @@
 | Section Detection & Formatting Warnings | ✅ | ✅ |
 | ATS Score (0–100) with 5-dimension breakdown | ✅ | ✅ |
 | Keyword Gap Analysis | ✅ (rule-based) | ✅ (AI-enhanced) |
-| Resume Structuring | ✅ (local parser) | ✅ (GPT-4o-mini) |
+| Resume Structuring | ✅ (local parser) | ✅ (GPT-4.1 / GPT-4o / more) |
 | Deterministic ATS Optimization | ✅ | ✅ |
-| AI Resume Optimization | ❌ | ✅ (GPT-4o-mini) |
+| AI Resume Optimization | ❌ | ✅ (your choice of model) |
 | Job Description Parsing | ✅ (rule-based) | ✅ (AI cross-referenced) |
 | Before/After Diff Viewer | ✅ | ✅ |
 | Export PDF / DOCX / TXT / MD | ✅ (professional templates) | ✅ (**AI-Enhanced** export) |
 | Cover Letter Generation | ❌ | ✅ |
+| **Model Selector** (6 OpenAI models) | — | ✅ |
+
+## 🔒 Privacy
+
+- **Without an API key**: everything runs 100% in your browser — no data ever leaves your device
+- **With an API key**: your resume and job description are sent **directly to OpenAI** using your own key — no intermediate server
+- API key is stored **in memory only** — it never touches disk and disappears when you close the tab
+- No analytics, no tracking, no cookies either way
 
 ## 🧠 Resume Type Detection
 
-The app automatically detects which of **7 resume profiles** best fits your resume and adapts the section order accordingly:
+The app automatically detects which of **7 resume profiles** best fits your resume and adapts section order accordingly:
 
 | Profile | Best For | Section Priority |
 |---|---|---|
 | 🏢 Experienced Professional | 5+ years, linear career | Experience → Skills → Education |
 | 🌱 Mid-Level | 2–5 years | Experience → Skills → Education |
-| 🎓 Entry-Level | 0–2 years, limited experience | Skills → Education → Projects → Experience |
+| 🎓 Entry-Level | 0–2 years | Skills → Education → Projects → Experience |
 | 🎒 Student / New Grad | Still enrolled | Education → Projects → Skills → Experience |
 | 🔬 Academic / Researcher | PhD, publications | Education → Research → Publications → Experience |
 | 📜 Certification-Heavy | Certs outweigh degrees | Certifications → Skills → Experience → Education |
 | 🔄 Career Changer | Gap or pivot detected | Summary → Transferable Skills → Education → Experience |
 
-Section ordering is applied consistently across **optimization, PDF export, DOCX export, TXT export, and Markdown export**.
+Section ordering applies consistently across optimization, PDF, DOCX, TXT, and Markdown exports.
 
-## 🤖 AI Integration (ATS Best Practices)
+## 🤖 AI Model Selection
 
-When an OpenAI API key is provided, every AI call is grounded in ATS best practices from Harvard OCS and Columbia CCE guidelines:
+When an OpenAI API key is provided, choose from 6 models in the API key panel:
 
-- **Parse Resume** — extracts structured data while preserving the full original context
-- **Parse Job Description** — cross-references resume keywords to surface real gaps
-- **Optimize Resume** — rebuilds the *entire* existing resume (never generates from scratch), incorporates detected profile, applies CAR-method bullet rewrites, strong action verbs, and keyword injection
-- **Export (AI-Enhanced)** — each downloaded file is formatted by a dedicated AI call before writing to disk; downloads show a ✨ **AI-Enhanced** badge
-- **Cover Letter** — tailored with full resume + job description context
+| Model | Best For |
+|---|---|
+| **GPT-4.1 mini** *(default)* | Smartest fast & affordable — recommended |
+| GPT-4o mini | Fast & affordable classic |
+| GPT-4.1 | Latest GPT-4.1 — sharp instruction following |
+| GPT-4o | High quality flagship |
+| GPT-4 Turbo | Large context window |
+| GPT-3.5 Turbo | Fastest & cheapest |
+
+Every AI call injects ATS best-practice prompts from Harvard OCS and Columbia CCE guidelines.
 
 ## 📤 Export Quality
-
-All exports use profile-aware section ordering and professional formatting:
 
 | Format | Template |
 |---|---|
 | **PDF** | Professional typography, section rules, bullet points, contact header |
-| **DOCX** | Properly structured Word document using `Packer.toBlob` (browser-compatible) |
+| **DOCX** | Properly structured Word document (`Packer.toBlob` — browser-compatible) |
 | **TXT** | Clean plain-text with consistent spacing (ATS-safe) |
 | **Markdown** | Structured `.md` with headings and bullet lists |
 
-When an API key is present, exports are AI-formatted before download for maximum quality.
-
-## 🔒 Privacy First
-
-- Your resume is **never uploaded to any server** — everything runs in the browser
-- OpenAI API key is stored **in memory only** — it disappears when you close the tab
-- No analytics, no tracking, no cookies
-- Non-AI features work completely **offline**
+With an API key, exports are AI-formatted before download (✨ AI-Enhanced badge).
 
 ## 🚀 Self-Hosting
 
 ### Option 1: Vercel (Recommended, 1-click)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YOUR_USERNAME/ats-resume-improver)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/simeononsecurity/ats-resume-improver)
 
 ### Option 2: Netlify
 
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/YOUR_USERNAME/ats-resume-improver)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/simeononsecurity/ats-resume-improver)
 
 ### Option 3: GitHub Pages
 
-1. Fork this repository
+1. Fork [simeononsecurity/ats-resume-improver](https://github.com/simeononsecurity/ats-resume-improver)
 2. Go to **Settings → Pages**
 3. Set source to **GitHub Actions**
 4. Push — it deploys automatically via the included workflow
@@ -89,17 +97,14 @@ When an API key is present, exports are AI-formatted before download for maximum
 ### Option 4: Local Development (npm)
 
 ```bash
-# Clone
-git clone https://github.com/YOUR_USERNAME/ats-resume-improver
+git clone https://github.com/simeononsecurity/ats-resume-improver
 cd ats-resume-improver
 
-# Install & run
 make install
 make dev           # http://localhost:5173
 
 # Or without Make
-npm install
-npm run dev
+npm install && npm run dev
 ```
 
 ### Option 5: Docker (Recommended for reproducible environments)
@@ -116,20 +121,16 @@ docker compose up --build dev
 docker compose up --build prod
 ```
 
-See **[Makefile reference](#-makefile-reference)** below for all available targets.
-
 ### Option 6: Static File Server
 
 ```bash
 make build
 npx serve dist
-# or
-python3 -m http.server 8080 --directory dist
 ```
 
 ## 🐳 Docker
 
-The project ships with a **multi-stage Dockerfile** and a **docker-compose.yml** covering both development and production:
+Multi-stage Dockerfile with dev and prod targets:
 
 ```
 Dockerfile
@@ -138,16 +139,12 @@ Dockerfile
 └── prod   — nginx 1.26 Alpine serving ./dist (port 80/8080)
 ```
 
-`docker-compose.yml` exposes two services:
-
-| Service | Target stage | Host port | Description |
+| Service | Target | Host port | Description |
 |---|---|---|---|
-| `dev` | `dev` | 5173 | Hot-reload dev server with source volume mount |
+| `dev` | `dev` | 5173 | Hot-reload dev server, source-mounted |
 | `prod` | `prod` | 8080 | Optimised nginx static build |
 
-### Volume mount for hot-reload
-
-The `dev` service mounts the project root into `/app` while keeping `node_modules` inside the container:
+The dev service mounts the project root for instant hot-reload:
 
 ```yaml
 volumes:
@@ -155,38 +152,37 @@ volumes:
   - /app/node_modules
 ```
 
-Edit any file locally and the browser refreshes instantly — no rebuild needed.
-
 ## 🛠 Makefile Reference
 
-Run `make` or `make help` to see all targets:
-
 ```
+make help
+
   install                Install npm dependencies
-  dev                    Start local development server (http://localhost:5173)
+  dev                    Start local dev server (http://localhost:5173)
   build                  Build production bundle into ./dist
-  preview                Build then preview production bundle (http://localhost:4173)
+  preview                Build + preview (http://localhost:4173)
   clean                  Remove build artefacts and node_modules
 
-  docker-dev             Build & start dev container with hot-reload (http://localhost:5173)
-  docker-dev-detach      Build & start dev container in the background
-  docker-dev-down        Stop & remove the dev container
-  docker-prod            Build & start production nginx container (http://localhost:8080)
-  docker-prod-detach     Build & start production container in the background
-  docker-prod-down       Stop & remove the production container
+  docker-dev             Build & start dev container (http://localhost:5173)
+  docker-dev-detach      Background dev container
+  docker-dev-down        Stop dev container
+  docker-prod            Build & start prod nginx (http://localhost:8080)
+  docker-prod-detach     Background prod container
+  docker-prod-down       Stop prod container
 
-  docker-build           Build both Docker images without starting containers
+  docker-build           Build both images without starting
   docker-clean           Remove all project Docker images and volumes
-  logs                   Tail logs from all running containers
+  logs                   Tail logs from running containers
 ```
 
 ## 🔑 OpenAI API Key Setup
 
 1. Get a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-2. Enter it in the app's API key field (top bar or sidebar)
-3. The key is stored **in memory only** — it disappears when you close the tab
+2. Enter it in the API key panel (sidebar on desktop, upload page on mobile)
+3. Select your preferred model from the dropdown
+4. The key is stored **in memory only** — gone when you close the tab
 
-**Cost estimate:** Analysing + optimising one resume costs approximately **$0.01–0.05** with GPT-4o-mini.
+**Cost estimate:** Analysing + optimising one resume costs approximately **$0.002–0.05** depending on model.
 
 ## 🏗️ Tech Stack
 
@@ -199,50 +195,55 @@ Run `make` or `make help` to see all targets:
 | PDF Parse | pdfjs-dist |
 | DOCX Parse | mammoth |
 | PDF Export | jsPDF |
-| DOCX Export | docx (`Packer.toBlob` — browser-compatible) |
-| AI | OpenAI GPT-4o-mini (user-supplied key) |
+| DOCX Export | docx (`Packer.toBlob`) |
+| AI | OpenAI (user-supplied key, 6 model choices) |
 | Container | Docker + nginx (multi-stage) |
 
 ## 📁 Project Structure
 
 ```
+ats-resume-improver/
 ├── Dockerfile              # Multi-stage: dev / builder / prod-nginx
 ├── docker-compose.yml      # dev (5173) and prod (8080) services
-├── Makefile                # Convenience targets for local + Docker workflows
+├── Makefile                # 14 convenience targets
 ├── .github/workflows/
 │   └── deploy.yml          # GitHub Pages auto-deploy
 └── src/
     ├── components/
     │   ├── ui/                    # Button, Card, Badge, Progress
-    │   ├── ApiKeySetup.tsx        # OpenAI key entry (memory-only)
+    │   ├── ApiKeySetup.tsx        # API key + model selector
     │   ├── ResumeUpload.tsx       # File upload + paste
-    │   ├── AtsView.tsx            # "What the ATS sees" + detected profile card
-    │   ├── JobDescriptionInput.tsx # Job posting input (cross-referenced with resume)
+    │   ├── AtsView.tsx            # "What the ATS sees" + profile card
+    │   ├── JobDescriptionInput.tsx # Job posting (cross-referenced with resume)
     │   ├── KeywordAnalysis.tsx    # Keyword gap visualisation
-    │   ├── AtsScore.tsx           # Score dashboard with 5-dimension breakdown
+    │   ├── AtsScore.tsx           # Score + 5-dimension breakdown
     │   ├── ResumeOptimizer.tsx    # AI / local optimizer
-    │   ├── DiffViewer.tsx         # Before/after comparison + inline exports
-    │   ├── ExportOptions.tsx      # PDF/DOCX/TXT/MD export with AI-enhanced mode
+    │   ├── DiffViewer.tsx         # Before/after + inline exports
+    │   ├── ExportOptions.tsx      # PDF/DOCX/TXT/MD with AI-enhanced mode
     │   └── CoverLetterGenerator.tsx
     └── lib/
-        ├── documentParser.ts      # PDF / DOCX / TXT extraction + ATS view
-        ├── atsAnalyzer.ts         # Rule-based ATS scoring (weighted, 5 dimensions)
+        ├── documentParser.ts      # PDF / DOCX / TXT extraction
+        ├── atsAnalyzer.ts         # Rule-based ATS scoring
         ├── keywordMatcher.ts      # Keyword gap analysis
-        ├── resumeTypeDetector.ts  # 7-profile detection + dynamic section ordering
-        ├── openaiService.ts       # OpenAI integration (ATS best-practice prompts)
+        ├── resumeTypeDetector.ts  # 7-profile detection + section ordering
+        ├── openaiService.ts       # OpenAI (6 models, ATS best-practice prompts)
         ├── openaiExport.ts        # AI-enhanced export formatting
         ├── exportService.ts       # PDF / DOCX / TXT / MD generation
-        └── utils.ts               # cn(), downloadBlob(), helpers
+        └── utils.ts
 ```
 
 ## 🔮 Roadmap
 
-- [ ] Multiple AI providers (Anthropic Claude, Google Gemini, Ollama/local)
+- [ ] Additional AI providers (Anthropic Claude, Google Gemini, Ollama/local)
 - [ ] Resume version history (IndexedDB)
 - [ ] LinkedIn profile optimizer
 - [ ] Interview question predictor
 - [ ] Salary range estimator
 - [ ] Cloudflare Pages deploy button
+
+## 🤝 Contributing
+
+Pull requests are welcome. For major changes, open an issue first. See the [GitHub repo](https://github.com/simeononsecurity/ats-resume-improver) for the latest.
 
 ## 📄 License
 

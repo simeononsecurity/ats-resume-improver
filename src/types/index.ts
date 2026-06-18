@@ -77,6 +77,7 @@ export interface OptimizedResume {
 export interface AppState {
   step: AppStep
   apiKey: string
+  aiModel: string
   resumeRawText: string
   resumeData: ResumeData | null
   jobDescription: string

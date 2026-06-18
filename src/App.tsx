@@ -19,13 +19,14 @@ import { CoverLetterGenerator } from '@/components/CoverLetterGenerator'
 import type { AppState, AppStep, ResumeData, JobDescriptionData, OptimizedResume } from '@/types'
 import { scoreResume } from '@/lib/atsAnalyzer'
 import { analyzeKeywords } from '@/lib/keywordMatcher'
-import { parseResumeLocal } from '@/lib/openaiService'
+import { parseResumeLocal, DEFAULT_MODEL } from '@/lib/openaiService'
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
 const initialState: AppState = {
   step: 'upload',
   apiKey: '',
+  aiModel: DEFAULT_MODEL,
   resumeRawText: '',
   resumeData: null,
   jobDescription: '',
@@ -41,6 +42,7 @@ const initialState: AppState = {
 
 type Action =
   | { type: 'SET_API_KEY'; payload: string }
+  | { type: 'SET_AI_MODEL'; payload: string }
   | { type: 'SET_RESUME'; payload: { rawText: string; fileName: string } }
   | { type: 'SET_RESUME_DATA'; payload: ResumeData }
   | { type: 'SET_JOB_DATA'; payload: JobDescriptionData }
@@ -55,6 +57,9 @@ function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'SET_API_KEY':
       return { ...state, apiKey: action.payload }
+
+    case 'SET_AI_MODEL':
+      return { ...state, aiModel: action.payload }
 
     case 'SET_RESUME': {
       const resumeData: ResumeData = parseResumeLocal(action.payload.rawText)
@@ -135,7 +140,7 @@ export default function App() {
       ;(async () => {
         try {
           const { parseResumeWithAI } = await import('@/lib/openaiService')
-          const data = await parseResumeWithAI(state.apiKey, rawText)
+          const data = await parseResumeWithAI(state.apiKey, rawText, state.aiModel)
           dispatch({ type: 'SET_RESUME_DATA', payload: data })
         } catch { /* silently fail */ }
       })()
@@ -208,7 +213,12 @@ export default function App() {
               )
             })}
             <div className="mt-4 pt-4 border-t border-[#2e3347]">
-              <ApiKeySetup apiKey={state.apiKey} onSave={key => dispatch({ type: 'SET_API_KEY', payload: key })} />
+              <ApiKeySetup
+                apiKey={state.apiKey}
+                onSave={key => dispatch({ type: 'SET_API_KEY', payload: key })}
+                selectedModel={state.aiModel}
+                onModelChange={m => dispatch({ type: 'SET_AI_MODEL', payload: m })}
+              />
             </div>
           </aside>
 
@@ -241,7 +251,12 @@ export default function App() {
             {state.step === 'upload' && (
               <StepWrapper title="Upload Your Resume" subtitle="Start by uploading your resume. We'll extract and analyze the text instantly." icon={<Upload className="w-5 h-5 text-indigo-400" />}>
                 <div className="lg:hidden mb-6">
-                  <ApiKeySetup apiKey={state.apiKey} onSave={key => dispatch({ type: 'SET_API_KEY', payload: key })} />
+                  <ApiKeySetup
+                    apiKey={state.apiKey}
+                    onSave={key => dispatch({ type: 'SET_API_KEY', payload: key })}
+                    selectedModel={state.aiModel}
+                    onModelChange={m => dispatch({ type: 'SET_AI_MODEL', payload: m })}
+                  />
                 </div>
                 <ResumeUpload onParsed={handleResumeParsed} isLoading={state.isLoading} />
                 <div className="mt-8 grid sm:grid-cols-3 gap-4">
@@ -269,7 +284,7 @@ export default function App() {
             {/* Job Description */}
             {state.step === 'job-description' && hasResume && (
               <StepWrapper title="Job Description" subtitle="Paste the job posting to unlock keyword gap analysis and targeted optimization." icon={<Briefcase className="w-5 h-5 text-cyan-400" />} nextStep={() => setStep('analysis')} nextLabel="View Analysis →" skipStep={() => setStep('optimize')} skipLabel="Skip to Optimize">
-                <JobDescriptionInput apiKey={state.apiKey} resumeRawText={state.resumeRawText} onAnalyzed={jd => dispatch({ type: 'SET_JOB_DATA', payload: jd })} jobData={state.jobData} />
+                <JobDescriptionInput apiKey={state.apiKey} aiModel={state.aiModel} resumeRawText={state.resumeRawText} onAnalyzed={jd => dispatch({ type: 'SET_JOB_DATA', payload: jd })} jobData={state.jobData} />
               </StepWrapper>
             )}
 
@@ -303,7 +318,7 @@ export default function App() {
             {/* Optimize */}
             {state.step === 'optimize' && hasResume && state.resumeData && (
               <StepWrapper title="Optimize Resume" subtitle={state.apiKey ? 'AI-powered optimization using GPT-4o' : 'Deterministic ATS optimization (no API key needed)'} icon={<Wand2 className="w-5 h-5 text-indigo-400" />} nextStep={state.optimizedResume ? () => setStep('diff') : undefined} nextLabel="View Changes →">
-                <ResumeOptimizer apiKey={state.apiKey} resumeData={state.resumeData} jobData={state.jobData} keywordAnalysis={state.keywordAnalysis} optimizedResume={state.optimizedResume} onOptimized={result => dispatch({ type: 'SET_OPTIMIZED', payload: result })} />
+                <ResumeOptimizer apiKey={state.apiKey} aiModel={state.aiModel} resumeData={state.resumeData} jobData={state.jobData} keywordAnalysis={state.keywordAnalysis} optimizedResume={state.optimizedResume} onOptimized={result => dispatch({ type: 'SET_OPTIMIZED', payload: result })} />
               </StepWrapper>
             )}
 
@@ -332,7 +347,7 @@ export default function App() {
                     <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider flex items-center gap-2">
                       <Mail className="w-4 h-4" />Cover Letter
                     </h3>
-                    <CoverLetterGenerator apiKey={state.apiKey} resumeData={state.resumeData} jobData={state.jobData} coverLetter={state.coverLetter} onGenerated={letter => dispatch({ type: 'SET_COVER_LETTER', payload: letter })} />
+                    <CoverLetterGenerator apiKey={state.apiKey} aiModel={state.aiModel} resumeData={state.resumeData} jobData={state.jobData} coverLetter={state.coverLetter} onGenerated={letter => dispatch({ type: 'SET_COVER_LETTER', payload: letter })} />
                   </div>
                 </div>
               </StepWrapper>

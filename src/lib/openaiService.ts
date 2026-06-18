@@ -2,10 +2,20 @@ import type { ResumeData, JobDescriptionData, OptimizedResume, OptimizationChang
 import { getSectionOrder, SECTION_TITLES } from './resumeTypeDetector'
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
-const MODEL = 'gpt-4o-mini'
+
+export const AVAILABLE_MODELS = [
+  { id: 'gpt-4.1-mini',  label: 'GPT-4.1 mini',   desc: 'Recommended — smartest fast & affordable model' },
+  { id: 'gpt-4o-mini',   label: 'GPT-4o mini',     desc: 'Fast & affordable — great default' },
+  { id: 'gpt-4.1',       label: 'GPT-4.1',         desc: 'Latest GPT-4.1 — sharp instruction following' },
+  { id: 'gpt-4o',        label: 'GPT-4o',          desc: 'High quality, flagship model' },
+  { id: 'gpt-4-turbo',   label: 'GPT-4 Turbo',     desc: 'High quality, large context window' },
+  { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo',   desc: 'Fastest & cheapest option' },
+] as const
+
+export type OpenAIModelId = typeof AVAILABLE_MODELS[number]['id']
+export const DEFAULT_MODEL: OpenAIModelId = 'gpt-4o-mini'
 
 // ─── Shared ATS Best-Practices Context ────────────────────────────────────────
-// Injected into every system prompt that touches resume content
 
 const ATS_EXPERTISE = `
 You are an expert ATS resume strategist trained on best practices from Harvard OCS, Columbia CCE, and 
@@ -46,13 +56,14 @@ SUMMARY SECTION RULES:
 • Rewrite summary to DIRECTLY address the specific role being targeted
 `
 
-// ─── OpenAI API Call ──────────────────────────────────────────────────────────
+// ─── Core OpenAI Fetch ────────────────────────────────────────────────────────
 
 async function callOpenAI(
   apiKey: string,
   systemPrompt: string,
   userPrompt: string,
-  temperature = 0.3
+  temperature = 0.3,
+  model: string = DEFAULT_MODEL,
 ): Promise<string> {
   const response = await fetch(OPENAI_API_URL, {
     method: 'POST',
@@ -61,7 +72,7 @@ async function callOpenAI(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       temperature,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -72,7 +83,7 @@ async function callOpenAI(
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}))
-    const msg = (err as any)?.error?.message ?? response.statusText
+    const msg = (err as { error?: { message?: string } })?.error?.message ?? response.statusText
     throw new Error(`OpenAI API error: ${msg}`)
   }
 
@@ -83,31 +94,23 @@ async function callOpenAI(
 // ─── Parse Resume Locally (No AI) ────────────────────────────────────────────
 
 export function parseResumeLocal(rawText: string): ResumeData {
-  const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean)
-
+  const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean)
   const name = lines[0] ?? ''
-
-  const emailMatch = rawText.match(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i)
-  const email = emailMatch?.[0] ?? ''
-
-  const phoneMatch = rawText.match(/(\+?1\s?)?(\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4})/)
-  const phone = phoneMatch?.[0] ?? ''
+  const email = rawText.match(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i)?.[0] ?? ''
+  const phone = rawText.match(/(\+?1\s?)?(\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4})/)?.[0] ?? ''
 
   let summary = ''
-  const summaryIdx = lines.findIndex(l => /^(summary|objective|profile|about|overview)/i.test(l))
-  if (summaryIdx >= 0 && summaryIdx + 1 < lines.length) {
-    summary = lines[summaryIdx + 1]
-  }
+  const summaryIdx = lines.findIndex((l) => /^(summary|objective|profile|about|overview)/i.test(l))
+  if (summaryIdx >= 0 && summaryIdx + 1 < lines.length) summary = lines[summaryIdx + 1]
 
   const skills: string[] = []
-  const skillsIdx = lines.findIndex(l => /^skills/i.test(l))
+  const skillsIdx = lines.findIndex((l) => /^skills/i.test(l))
   if (skillsIdx >= 0 && skillsIdx + 1 < lines.length) {
-    const skillLine = lines[skillsIdx + 1]
-    skills.push(...skillLine.split(/[,•·|]/).map(s => s.trim()).filter(Boolean))
+    skills.push(...lines[skillsIdx + 1].split(/[,•·|]/).map((s) => s.trim()).filter(Boolean))
   }
 
   const certifications: string[] = []
-  const certIdx = lines.findIndex(l => /^certifications?/i.test(l))
+  const certIdx = lines.findIndex((l) => /^certifications?/i.test(l))
   if (certIdx >= 0) {
     for (let i = certIdx + 1; i < Math.min(certIdx + 6, lines.length); i++) {
       if (/^(education|experience|skills)/i.test(lines[i])) break
@@ -118,13 +121,9 @@ export function parseResumeLocal(rawText: string): ResumeData {
   const experience: ResumeData['experience'] = []
   let inExperience = false
   let currentExp: ResumeData['experience'][0] | null = null
-
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    if (/^(professional experience|work history|employment|experience)/i.test(line)) {
-      inExperience = true
-      continue
-    }
+    if (/^(professional experience|work history|employment|experience)/i.test(line)) { inExperience = true; continue }
     if (/^(education|skills|certifications?|projects?)/i.test(line)) {
       inExperience = false
       if (currentExp) { experience.push(currentExp); currentExp = null }
@@ -133,14 +132,8 @@ export function parseResumeLocal(rawText: string): ResumeData {
     if (inExperience) {
       if (line.includes('|')) {
         if (currentExp) experience.push(currentExp)
-        const parts = line.split('|').map(p => p.trim())
-        currentExp = {
-          title: parts[0] ?? '',
-          company: parts[1] ?? '',
-          startDate: parts[2]?.split('-')[0]?.trim() ?? '',
-          endDate: parts[2]?.split('-')[1]?.trim() ?? 'Present',
-          bullets: [],
-        }
+        const parts = line.split('|').map((p) => p.trim())
+        currentExp = { title: parts[0] ?? '', company: parts[1] ?? '', startDate: parts[2]?.split('-')[0]?.trim() ?? '', endDate: parts[2]?.split('-')[1]?.trim() ?? 'Present', bullets: [] }
       } else if (currentExp && (line.startsWith('-') || line.startsWith('•'))) {
         currentExp.bullets.push(line.replace(/^[-•]\s*/, ''))
       }
@@ -149,12 +142,12 @@ export function parseResumeLocal(rawText: string): ResumeData {
   if (currentExp) experience.push(currentExp)
 
   const education: ResumeData['education'] = []
-  const eduIdx = lines.findIndex(l => /^education/i.test(l))
+  const eduIdx = lines.findIndex((l) => /^education/i.test(l))
   if (eduIdx >= 0) {
     for (let i = eduIdx + 1; i < Math.min(eduIdx + 8, lines.length); i++) {
       if (/^(experience|skills|certifications?|projects?)/i.test(lines[i])) break
       if (lines[i].includes('|')) {
-        const parts = lines[i].split('|').map(p => p.trim())
+        const parts = lines[i].split('|').map((p) => p.trim())
         education.push({ degree: parts[0] ?? '', institution: parts[1] ?? '', year: parts[2] ?? '' })
       }
     }
@@ -167,11 +160,11 @@ export function parseResumeLocal(rawText: string): ResumeData {
 
 export async function parseResumeWithAI(
   apiKey: string,
-  resumeText: string
+  resumeText: string,
+  model: string = DEFAULT_MODEL,
 ): Promise<ResumeData> {
   const system = `You are an expert resume parser and ATS specialist.
 ${ATS_EXPERTISE}
-
 TASK: Extract structured data from this resume with perfect accuracy.
 Return ONLY valid JSON — no markdown, no code fences, no explanation.
 Do NOT fabricate data. If a field is missing, use "" or [].
@@ -184,27 +177,15 @@ ${resumeText.slice(0, 8000)}
 
 Return this exact JSON structure:
 {
-  "name": "",
-  "email": "",
-  "phone": "",
-  "location": "",
-  "summary": "",
-  "experience": [
-    { "title": "", "company": "", "startDate": "", "endDate": "", "bullets": [] }
-  ],
-  "education": [
-    { "degree": "", "institution": "", "year": "", "gpa": "" }
-  ],
-  "skills": [],
-  "certifications": [],
-  "rawText": ""
+  "name": "", "email": "", "phone": "", "location": "", "summary": "",
+  "experience": [{ "title": "", "company": "", "startDate": "", "endDate": "", "bullets": [] }],
+  "education": [{ "degree": "", "institution": "", "year": "", "gpa": "" }],
+  "skills": [], "certifications": [], "rawText": ""
 }`
 
-  const raw = await callOpenAI(apiKey, system, user, 0.1)
-
+  const raw = await callOpenAI(apiKey, system, user, 0.1, model)
   try {
-    const parsed = JSON.parse(raw)
-    return { ...parsed, rawText: resumeText }
+    return { ...JSON.parse(raw), rawText: resumeText }
   } catch {
     const match = raw.match(/\{[\s\S]*\}/)
     if (match) {
@@ -215,22 +196,16 @@ Return this exact JSON structure:
 }
 
 // ─── Stage 2: Parse Job Description with AI ──────────────────────────────────
-// Receives resume text too for cross-referenced analysis
 
 export async function parseJobDescriptionWithAI(
   apiKey: string,
   jobText: string,
-  resumeRawText?: string
+  resumeRawText?: string,
+  model: string = DEFAULT_MODEL,
 ): Promise<JobDescriptionData> {
   const system = `You are an expert recruiter and ATS keyword strategist.
 ${ATS_EXPERTISE}
-
 TASK: Extract and prioritize all requirements from this job description.
-Focus on:
-1. Technical hard skills and exact tool/technology names (use exact casing: "JavaScript" not "javascript")
-2. Required vs preferred qualifications
-3. Specific certifications or credentials
-4. Job responsibilities (for context of how skills are used)
 Return ONLY valid JSON — no markdown, no code fences.`
 
   const resumeContext = resumeRawText
@@ -244,21 +219,14 @@ ${jobText.slice(0, 5000)}
 
 Return this exact JSON:
 {
-  "title": "exact job title",
-  "company": "company name if stated",
-  "requiredSkills": ["list of must-have skills/qualifications as stated"],
-  "preferredSkills": ["list of nice-to-have skills"],
-  "technologies": ["all specific tools, platforms, languages, frameworks mentioned"],
-  "certifications": ["any certifications mentioned"],
-  "responsibilities": ["key responsibilities — what you'll be doing day-to-day"],
-  "rawText": ""
+  "title": "exact job title", "company": "company name if stated",
+  "requiredSkills": [], "preferredSkills": [], "technologies": [],
+  "certifications": [], "responsibilities": [], "rawText": ""
 }`
 
-  const raw = await callOpenAI(apiKey, system, user, 0.1)
-
+  const raw = await callOpenAI(apiKey, system, user, 0.1, model)
   try {
-    const parsed = JSON.parse(raw)
-    return { ...parsed, rawText: jobText }
+    return { ...JSON.parse(raw), rawText: jobText }
   } catch {
     const match = raw.match(/\{[\s\S]*\}/)
     if (match) {
@@ -269,15 +237,14 @@ Return this exact JSON:
 }
 
 // ─── Stage 3: Optimize Resume with AI ────────────────────────────────────────
-// Always sends full resume + full job description
 
 export async function optimizeResumeWithAI(
   apiKey: string,
   resumeData: ResumeData,
   jobData: JobDescriptionData | null,
-  missingKeywords: string[]
+  missingKeywords: string[],
+  model: string = DEFAULT_MODEL,
 ): Promise<OptimizedResume> {
-  // Detect resume type for smart section ordering
   const { detectResumeType, getSectionOrder } = await import('./resumeTypeDetector')
   const profile = detectResumeType(resumeData)
   const sectionOrder = getSectionOrder(resumeData)
@@ -289,25 +256,24 @@ CANDIDATE PROFILE DETECTED: ${profile.icon} ${profile.label}
 ${profile.description}
 ${profile.rationale}
 
-RECOMMENDED SECTION ORDER FOR THIS CANDIDATE TYPE:
-${sectionOrder.join(' → ')}
-This order puts the candidate's strongest assets first. FOLLOW THIS ORDER in both atsVersion and tailoredVersion.
+RECOMMENDED SECTION ORDER: ${sectionOrder.join(' → ')}
+FOLLOW THIS ORDER in both atsVersion and tailoredVersion.
 
 YOUR MISSION: Transform this resume into the highest-probability version to pass ATS AND impress human recruiters.
 
-OPTIMIZATION PRIORITIES (in order):
-1. Reorder sections to: ${sectionOrder.join(' → ')} — most impactful sections first for this candidate type
-2. Rewrite the PROFESSIONAL SUMMARY to directly target the specific role (mention job title, top 3 keywords, years of experience)
-3. Improve bullet points using CAR method: [Strong Action Verb] + [Context with Keywords] + [Quantifiable Result]
-4. Integrate missing keywords NATURALLY into existing content (only if the experience supports it)
-5. Strengthen action verbs: replace Managed→Administered/Directed, Made→Developed/Engineered, Helped→Spearheaded/Supported
-6. Add metrics to vague bullets (use reasonable estimates if the original implies scale)
+OPTIMIZATION PRIORITIES:
+1. Reorder sections: ${sectionOrder.join(' → ')}
+2. Rewrite PROFESSIONAL SUMMARY to target the specific role (job title + top 3 keywords + years experience)
+3. Improve bullets using CAR method: [Strong Action Verb] + [Context/Keyword] + [Quantifiable Result]
+4. Integrate missing keywords NATURALLY (only if the experience supports it)
+5. Strengthen weak action verbs: Managed→Directed, Made→Developed, Helped→Spearheaded
+6. Add metrics to vague bullets where the original implies scale
 7. Ensure ATS formatting: ALL CAPS section headers, no tables, single column
 
-ABSOLUTE CONSTRAINTS:
-• PRESERVE every job, company, title, date, degree — do NOT change any factual information
-• Do NOT fabricate experience, skills, certifications, or companies the candidate doesn't have
-• The output must be COMPLETE — every section with ALL original content
+CONSTRAINTS:
+• PRESERVE every job, company, title, date, degree — no factual changes
+• Do NOT fabricate experience, skills, certifications, or companies
+• Output must be COMPLETE — every section with ALL original content
 • Return ONLY valid JSON — no markdown fences, no comments`
 
   const jobContext = jobData
@@ -315,49 +281,37 @@ ABSOLUTE CONSTRAINTS:
 REQUIRED SKILLS: ${jobData.requiredSkills.join(', ')}
 PREFERRED SKILLS: ${jobData.preferredSkills.join(', ')}
 KEY TECHNOLOGIES: ${jobData.technologies.join(', ')}
-CERTIFICATIONS MENTIONED: ${jobData.certifications.join(', ')}
-KEY RESPONSIBILITIES: ${jobData.responsibilities.slice(0, 5).join(' | ')}
-MISSING KEYWORDS (integrate naturally where experience supports): ${missingKeywords.slice(0, 15).join(', ')}`
-    : 'No specific job description — optimize for general ATS compatibility and modern recruiter expectations.'
+CERTIFICATIONS: ${jobData.certifications.join(', ')}
+RESPONSIBILITIES: ${jobData.responsibilities.slice(0, 5).join(' | ')}
+MISSING KEYWORDS: ${missingKeywords.slice(0, 15).join(', ')}`
+    : 'No specific job description — optimize for general ATS compatibility.'
 
-  const user = `Optimize this resume with full ATS best practices.
+  const user = `Optimize this resume.
 
 ${jobContext}
 
-=== FULL ORIGINAL RESUME TEXT (preserve all content) ===
+=== FULL ORIGINAL RESUME TEXT ===
 ${(resumeData.rawText || '').slice(0, 7000)}
 
-=== STRUCTURED DATA FOR REFERENCE ===
+=== STRUCTURED DATA ===
 Name: ${resumeData.name} | Email: ${resumeData.email} | Phone: ${resumeData.phone}
 Skills: ${resumeData.skills.join(', ')}
 ${resumeData.experience.length} experience entries | ${resumeData.education.length} education entries
-Certifications: ${resumeData.certifications.join(', ')}
 
-RETURN this exact JSON (no markdown, no fences):
+RETURN this exact JSON (no markdown):
 {
-  "atsVersion": "COMPLETE ATS-formatted resume as plain text — ALL sections, ALL jobs with ALL bullet points, ALL education, ALL skills",
-  "tailoredVersion": "COMPLETE resume tailored specifically for the target job — ALL sections preserved, keywords integrated",
-  "changes": [
-    {
-      "section": "Professional Summary|Experience|Skills|Education",
-      "original": "exact original text",
-      "updated": "improved text with explanation",
-      "reason": "why: CAR method applied|keyword integrated|action verb strengthened|metric added"
-    }
-  ],
+  "atsVersion": "COMPLETE ATS-formatted resume as plain text",
+  "tailoredVersion": "COMPLETE tailored resume for target job",
+  "changes": [{"section":"","original":"","updated":"","reason":""}],
   "structuredData": {
-    "name": "", "email": "", "phone": "", "location": "",
-    "summary": "rewritten to target specific role",
-    "experience": [{"title":"","company":"","startDate":"","endDate":"","bullets":["improved bullet 1","improved bullet 2"]}],
-    "education": [{"degree":"","institution":"","year":"","gpa":""}],
-    "skills": ["all skills including any newly integrated from JD"],
-    "certifications": [],
-    "rawText": ""
+    "name":"","email":"","phone":"","location":"","summary":"",
+    "experience":[{"title":"","company":"","startDate":"","endDate":"","bullets":[]}],
+    "education":[{"degree":"","institution":"","year":"","gpa":""}],
+    "skills":[],"certifications":[],"rawText":""
   }
 }`
 
-  const raw = await callOpenAI(apiKey, system, user, 0.3)
-
+  const raw = await callOpenAI(apiKey, system, user, 0.3, model)
   try {
     const parsed = JSON.parse(raw)
     return { ...parsed, structuredData: { ...parsed.structuredData, rawText: resumeData.rawText } } as OptimizedResume
@@ -375,17 +329,10 @@ RETURN this exact JSON (no markdown, no fences):
 
 // ─── Stage 4: Deterministic ATS Optimization (No API Key) ────────────────────
 
-export function optimizeResumeLocal(
-  resumeData: ResumeData,
-  missingKeywords: string[]
-): OptimizedResume {
+export function optimizeResumeLocal(resumeData: ResumeData, missingKeywords: string[]): OptimizedResume {
   const changes: OptimizationChange[] = []
-
-  // Start from raw text to preserve ALL content
   const rawLines = (resumeData.rawText || '').split('\n')
-
-  // Apply rule-based improvements line by line
-  const improvedLines = rawLines.map(line => {
+  const improvedLines = rawLines.map((line) => {
     const trimmed = line.trim()
     if (!trimmed) return line
     if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
@@ -398,7 +345,6 @@ export function optimizeResumeLocal(
   })
 
   const atsVersion = buildAtsVersion(improvedLines, resumeData)
-
   let tailoredVersion = atsVersion
   if (missingKeywords.length > 0) {
     tailoredVersion += `\n\nSUGGESTED KEYWORDS TO INTEGRATE\n${'─'.repeat(50)}\n` +
@@ -407,7 +353,6 @@ export function optimizeResumeLocal(
       `"[Action Verb] [keyword/tool] to [what you did], resulting in [measurable outcome]"\n\n` +
       `Keywords: ${missingKeywords.slice(0, 20).join(', ')}`
   }
-
   return { atsVersion, tailoredVersion, changes, structuredData: resumeData }
 }
 
@@ -416,27 +361,20 @@ function buildAtsVersion(_improvedLines: string[], resumeData: ResumeData): stri
     const order = getSectionOrder(resumeData)
     const DIV = '─'.repeat(50)
     const lines: string[] = []
-
     if (resumeData.name) lines.push(resumeData.name.toUpperCase())
     const contact = [resumeData.email, resumeData.phone, resumeData.location].filter(Boolean)
     if (contact.length) lines.push(contact.join(' | '))
     lines.push('')
-
     for (const section of order) {
       switch (section) {
         case 'summary':
-          if (resumeData.summary) {
-            lines.push(SECTION_TITLES.summary); lines.push(DIV)
-            lines.push(resumeData.summary); lines.push('')
-          }
+          if (resumeData.summary) { lines.push(SECTION_TITLES.summary, DIV, resumeData.summary, '') }
           break
         case 'experience':
           if (resumeData.experience.length > 0) {
-            lines.push(SECTION_TITLES.experience); lines.push(DIV)
+            lines.push(SECTION_TITLES.experience, DIV)
             for (const exp of resumeData.experience) {
-              lines.push('')
-              lines.push(`${exp.title} | ${exp.company}`)
-              lines.push(`${exp.startDate}${exp.endDate ? ' – ' + exp.endDate : ' – Present'}`)
+              lines.push('', `${exp.title} | ${exp.company}`, `${exp.startDate}${exp.endDate ? ' – ' + exp.endDate : ' – Present'}`)
               for (const bullet of exp.bullets) lines.push(`• ${improveBullet(bullet, [])}`)
             }
             lines.push('')
@@ -444,7 +382,7 @@ function buildAtsVersion(_improvedLines: string[], resumeData: ResumeData): stri
           break
         case 'education':
           if (resumeData.education.length > 0) {
-            lines.push(SECTION_TITLES.education); lines.push(DIV)
+            lines.push(SECTION_TITLES.education, DIV)
             for (const edu of resumeData.education) {
               lines.push(`${edu.degree} | ${edu.institution}${edu.year ? ' | ' + edu.year : ''}${edu.gpa ? ' | GPA: ' + edu.gpa : ''}`)
             }
@@ -452,45 +390,35 @@ function buildAtsVersion(_improvedLines: string[], resumeData: ResumeData): stri
           }
           break
         case 'skills':
-          if (resumeData.skills.length > 0) {
-            lines.push(SECTION_TITLES.skills); lines.push(DIV)
-            lines.push(resumeData.skills.join(' • ')); lines.push('')
-          }
+          if (resumeData.skills.length > 0) { lines.push(SECTION_TITLES.skills, DIV, resumeData.skills.join(' • '), '') }
           break
         case 'certifications':
           if (resumeData.certifications.length > 0) {
-            lines.push(SECTION_TITLES.certifications); lines.push(DIV)
+            lines.push(SECTION_TITLES.certifications, DIV)
             for (const cert of resumeData.certifications) lines.push(`• ${cert}`)
             lines.push('')
           }
           break
       }
     }
-
     return lines.join('\n')
   }
-
   return _improvedLines.join('\n')
 }
 
 function improveBullet(bullet: string, changes: OptimizationChange[]): string {
   let improved = bullet.trim()
   if (!improved) return improved
-
   improved = improved.charAt(0).toUpperCase() + improved.slice(1)
   if (improved.endsWith('.')) improved = improved.slice(0, -1)
 
-  // Weak phrase → strong action verb replacements (comprehensive list)
   const replacements: [RegExp, string][] = [
-    // Passive / weak openers
     [/^(was responsible for|responsible for)/i, 'Spearheaded'],
     [/^(helped with|assisted with|helped to|assisted)/i, 'Supported'],
     [/^(worked on|worked with)/i, 'Collaborated on'],
     [/^(was in charge of|in charge of)/i, 'Directed'],
     [/^(did the|did)/i, 'Executed'],
     [/^(was part of|participated in)/i, 'Contributed to'],
-
-    // Weak verbs → stronger alternatives
     [/^(managed servers?|managed the server)/i, 'Administered'],
     [/^(managed)/i, 'Directed'],
     [/^(made changes to|made improvements to)/i, 'Optimized'],
@@ -516,28 +444,23 @@ function improveBullet(bullet: string, changes: OptimizationChange[]): string {
       improved = improved.replace(pattern, replacement)
       if (improved !== original && changes) {
         changes.push({
-          section: 'Experience',
-          original,
-          updated: improved,
-          reason: `Replaced weak opening with strong action verb "${replacement}" for better ATS keyword placement and recruiter impact.`,
+          section: 'Experience', original, updated: improved,
+          reason: `Replaced weak opening with strong action verb "${replacement}" for better ATS impact.`,
         })
       }
       break
     }
   }
-
-  // Metrics check — we don't fabricate numbers, but bullets with metrics are already strong enough
-
   return improved
 }
 
 // ─── Stage 5: Cover Letter Generation ────────────────────────────────────────
-// Always sends full resume + full job description
 
 export async function generateCoverLetterWithAI(
   apiKey: string,
   resumeData: ResumeData,
-  jobData: JobDescriptionData
+  jobData: JobDescriptionData,
+  model: string = DEFAULT_MODEL,
 ): Promise<string> {
   const system = `You are a master cover letter writer combining expertise from Harvard OCS and professional recruiting.
 ${ATS_EXPERTISE}
@@ -550,7 +473,6 @@ COVER LETTER RULES:
 • Paragraph 4: Closing — clear next step, enthusiasm, thank you
 • Use EXACT keywords from the job description naturally woven in
 • Never use: "I believe I would be a great fit", "I am a quick learner", "I am passionate"
-• Always refer to specific requirements from the posting — show you read it carefully
 • Professional salutation: "Dear [Name]:" or "Dear Hiring Manager:" — never "To Whom It May Concern"
 • Do NOT write [placeholder] brackets or generic fillers — write the actual letter`
 
@@ -577,5 +499,5 @@ Key Responsibilities: ${jobData.responsibilities.slice(0, 5).join(' | ')}
 
 Write the complete cover letter now (no brackets, no placeholders):`
 
-  return callOpenAI(apiKey, system, user, 0.6)
+  return callOpenAI(apiKey, system, user, 0.6, model)
 }
