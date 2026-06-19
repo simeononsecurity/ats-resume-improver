@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react'
-import { Upload, FileText, Loader2, AlertCircle } from 'lucide-react'
+import { Upload, FileText, Loader2, AlertCircle, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
+import { isLikelyResume } from '@/lib/atsAnalyzer'
 
 interface ResumeUploadProps {
   onParsed: (rawText: string, fileName: string) => void
@@ -11,15 +12,21 @@ interface ResumeUploadProps {
 export function ResumeUpload({ onParsed, isLoading }: ResumeUploadProps) {
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState('')
+  const [warning, setWarning] = useState('')
   const [fileName, setFileName] = useState('')
 
   const processFile = useCallback(async (file: File) => {
     setError('')
+    setWarning('')
     setFileName(file.name)
     try {
       const { parseDocument, createAtsView } = await import('../lib/documentParser')
       const raw = await parseDocument(file)
       const normalized = createAtsView(raw)
+      const resumeCheck = isLikelyResume(normalized)
+      if (!resumeCheck.confident) {
+        setWarning(resumeCheck.reason)
+      }
       onParsed(normalized, file.name)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse file.')
@@ -96,6 +103,14 @@ export function ResumeUpload({ onParsed, isLoading }: ResumeUploadProps) {
         <div className="flex items-start gap-3 bg-red-600/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm text-red-400">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           {error}
+        </div>
+      )}
+
+      {/* Non-resume warning */}
+      {warning && (
+        <div className="flex items-start gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-4 py-3 text-sm text-yellow-400">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span><strong>Not a resume?</strong> {warning}</span>
         </div>
       )}
 

@@ -1,5 +1,56 @@
 import type { AtsScore, AtsIssue, ResumeData, JobDescriptionData } from '../types'
 
+// ─── Non-Resume Detection ────────────────────────────────────────────────────
+
+/**
+ * Heuristic check: does this text look like a resume?
+ * Returns a confidence value 0–1 and a short reason string when confidence is low.
+ */
+export function isLikelyResume(text: string): { confident: boolean; reason: string } {
+  const lower = text.toLowerCase()
+
+  // Positive signals — things commonly found in resumes
+  const positiveSignals = [
+    /\b(resume|curriculum vitae|cv)\b/i,
+    /\b(experience|work history|employment)\b/i,
+    /\b(education|university|college|degree|bachelor|master|phd)\b/i,
+    /\b(skills|proficiencies|technologies|competencies)\b/i,
+    /\b(summary|objective|profile)\b/i,
+    /\b(certifications?|licenses?)\b/i,
+    /\b(projects?|portfolio)\b/i,
+    /[\w.+-]+@[\w-]+\.[a-z]{2,}/i,           // email
+    /(\+?1\s?)?([\d\s\-().]{10,})/,           // phone number
+    /\b(19|20)\d{2}\b.*\b(present|current)\b/i, // date range
+    /\b(managed|developed|designed|led|built|created|improved|achieved)\b/i,
+  ]
+
+  // Negative signals — things that suggest this is NOT a resume
+  const negativeSignals = [
+    /\b(dear\s+\w+|to whom it may concern|sincerely|regards)\b/i,  // letter
+    /\b(chapter|section \d+|paragraph|thesis|abstract|bibliography)\b/i, // academic paper
+    /\b(invoice|total due|payment|billing|subtotal)\b/i,            // invoice
+    /\b(question \d+|answer:|response:|prompt:)\b/i,                // assignment/essay
+    /\b(once upon a time|story|narrative|novel|fiction)\b/i,        // creative writing
+    /\b(recipe|ingredients|instructions|preheat|tablespoon)\b/i,    // recipe
+  ]
+
+  const posCount = positiveSignals.filter(p => p.test(lower)).length
+  const negCount = negativeSignals.filter(p => p.test(lower)).length
+
+  // Require at least 3 positive signals and no strong negative signals
+  if (negCount >= 2) {
+    return { confident: false, reason: 'This document does not appear to be a resume — it may be a letter, essay, or other document.' }
+  }
+  if (negCount === 1 && posCount < 3) {
+    return { confident: false, reason: 'This document may not be a resume. ATS scores will be inaccurate for non-resume content.' }
+  }
+  if (posCount < 3) {
+    return { confident: false, reason: 'Could not find key resume sections (experience, education, skills, contact). ATS scores may not be meaningful.' }
+  }
+
+  return { confident: true, reason: '' }
+}
+
 // ─── Section Detection ───────────────────────────────────────────────────────
 
 const SECTION_PATTERNS: Record<string, RegExp[]> = {

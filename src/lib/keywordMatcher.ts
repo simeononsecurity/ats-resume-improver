@@ -7,6 +7,7 @@ const SKILL_RELATIONS: Record<string, string[]> = {
   javascript: ['js', 'node', 'nodejs', 'react', 'vue', 'angular', 'typescript', 'ts'],
   python: ['django', 'flask', 'fastapi', 'pandas', 'numpy', 'scikit'],
   java: ['spring', 'springboot', 'maven', 'gradle'],
+  golang: ['go', 'go lang'],        // 'go' is a common English word — alias via golang
   kubernetes: ['k8s', 'helm', 'container orchestration'],
   docker: ['containers', 'containerization', 'podman'],
   aws: ['amazon web services', 'ec2', 's3', 'lambda', 'cloudformation'],
@@ -25,8 +26,49 @@ const SKILL_RELATIONS: Record<string, string[]> = {
   security: ['cybersecurity', 'soc', 'siem', 'penetration testing', 'zero trust'],
 }
 
+// Short single-word tech terms that are also common English words and need
+// word-boundary matching to avoid false positives (e.g. "Go" inside "MongoDB")
+const WORD_BOUNDARY_TERMS = new Set([
+  'go', 'r', 'c', 'ruby', 'rust', 'swift', 'kotlin', 'scala', 'perl',
+  'lua', 'julia', 'dart', 'elm', 'clojure', 'haskell',
+])
+
 function normalize(str: string): string {
   return str.toLowerCase().trim().replace(/[\s-_]+/g, ' ')
+}
+
+/**
+ * Test whether a term appears in resumeText.
+ * For short/ambiguous single-word terms (≤ 5 chars or in WORD_BOUNDARY_TERMS)
+ * we require word boundaries so "Go" doesn't match "MongoDB" or prose "go".
+ * Also handles "Go" / "Golang" equivalence.
+ */
+function termExistsInText(resumeLower: string, rawTerm: string): boolean {
+  const termNorm = normalize(rawTerm)
+
+  // "Go" (the language) — match "golang" or literally "\bgo\b" as a tech context
+  // We require it to appear next to a tech context word OR as "golang"
+  if (termNorm === 'go') {
+    if (resumeLower.includes('golang')) return true
+    if (resumeLower.includes('go lang')) return true
+    // Only count standalone \bgo\b if it also appears near a tech indicator
+    const goMatch = /\bgo\b/i.test(resumeLower)
+    if (!goMatch) return false
+    // Require a nearby tech-context word within the same line
+    const lines = resumeLower.split('\n')
+    return lines.some(line =>
+      /\bgo\b/i.test(line) &&
+      /\b(language|lang|program|develop|build|service|microservice|backend|api|tool|compil)/i.test(line)
+    )
+  }
+
+  const needsBoundary = WORD_BOUNDARY_TERMS.has(termNorm) || (termNorm.length <= 3 && !termNorm.includes(' '))
+  if (needsBoundary) {
+    const escaped = termNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(`\\b${escaped}\\b`, 'i').test(resumeLower)
+  }
+
+  return resumeLower.includes(termNorm)
 }
 
 function findRelated(term: string, resumeText: string): string[] {
@@ -72,8 +114,7 @@ export function analyzeKeywords(
   const related: string[] = []
 
   for (const term of uniqueTerms) {
-    const termNorm = normalize(term)
-    if (resumeLower.includes(termNorm)) {
+    if (termExistsInText(resumeLower, term)) {
       matching.push(term)
     } else {
       missing.push(term)
@@ -107,7 +148,7 @@ export function parseJobDescriptionLocal(text: string): Partial<JobDescriptionDa
 
   // Common tech keywords to scan for
   const techKeywords = [
-    'JavaScript', 'TypeScript', 'Python', 'Java', 'C#', 'C++', 'Go', 'Rust', 'Ruby', 'PHP',
+    'JavaScript', 'TypeScript', 'Python', 'Java', 'C#', 'C++', 'Golang', 'Go', 'Rust', 'Ruby', 'PHP',
     'React', 'Vue', 'Angular', 'Node.js', 'Django', 'Flask', 'Spring',
     'AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'Terraform', 'Ansible',
     'SQL', 'MySQL', 'PostgreSQL', 'MongoDB', 'Redis', 'Elasticsearch',
@@ -130,7 +171,7 @@ export function parseJobDescriptionLocal(text: string): Partial<JobDescriptionDa
   const textLower = text.toLowerCase()
 
   for (const tech of techKeywords) {
-    if (textLower.includes(tech.toLowerCase())) {
+    if (termExistsInText(textLower, tech)) {
       technologies.push(tech)
     }
   }

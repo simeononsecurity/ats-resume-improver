@@ -26,6 +26,8 @@
 | Before/After Diff Viewer | ✅ | ✅ | ✅ |
 | Export PDF / DOCX / TXT / MD | ✅ professional templates | ✅ **AI-Enhanced** | ✅ **AI-Enhanced** |
 | Cover Letter Generation | ❌ | ✅ | ✅ |
+| **Interview Question Predictor** | ❌ | ✅ | ✅ |
+| **Salary Range Estimator** | ❌ | ✅ | ✅ |
 | **Multi-provider model selector** | — | ✅ OpenAI + Claude | ✅ 8 Ollama models |
 
 ## 🔒 Privacy
@@ -131,18 +133,22 @@ With an AI provider configured, exports are AI-formatted before download (✨ AI
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/simeononsecurity/ats-resume-improver)
 
-### Option 2: Netlify
+### Option 2: Cloudflare Pages
+
+[![Deploy to Cloudflare Pages](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/simeononsecurity/ats-resume-improver)
+
+### Option 3: Netlify
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/simeononsecurity/ats-resume-improver)
 
-### Option 3: GitHub Pages
+### Option 4: GitHub Pages
 
 1. Fork [simeononsecurity/ats-resume-improver](https://github.com/simeononsecurity/ats-resume-improver)
 2. Go to **Settings → Pages**
 3. Set source to **GitHub Actions**
 4. Push — it deploys automatically via the included workflow
 
-### Option 4: Local Development (npm)
+### Option 5: Local Development (npm)
 
 ```bash
 git clone https://github.com/simeononsecurity/ats-resume-improver
@@ -155,7 +161,7 @@ make dev           # http://localhost:5173
 npm install && npm run dev
 ```
 
-### Option 5: Docker (Recommended for reproducible environments)
+### Option 6: Docker (Recommended for reproducible environments)
 
 ```bash
 # Development — hot-reload on http://localhost:5173
@@ -172,7 +178,7 @@ docker compose up --build dev
 docker compose up --build prod
 ```
 
-### Option 6: Static File Server
+### Option 7: Static File Server
 
 ```bash
 make build
@@ -296,11 +302,11 @@ ats-resume-improver/
 
 - [x] Additional AI providers (Anthropic Claude, Ollama/local)
 - [x] AI-powered semantic keyword analysis with importance ratings
+- [x] Interview Question Predictor
+- [x] Salary Range Estimator
+- [x] Cloudflare Pages deploy button
 - [ ] Resume version history (IndexedDB)
 - [ ] LinkedIn profile optimizer
-- [ ] Interview question predictor
-- [ ] Salary range estimator
-- [ ] Cloudflare Pages deploy button
 - [ ] Google Gemini provider support
 
 ## 🤝 Contributing
