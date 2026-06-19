@@ -305,7 +305,15 @@ export default function App() {
                   {[
                     { icon: <Sparkles className="w-4 h-4 text-indigo-400" />, title: 'Keyword Gap Analysis', desc: 'See exactly which keywords are missing vs. the job posting' },
                     { icon: <Target className="w-4 h-4 text-amber-400" />, title: 'ATS Scoring', desc: 'Get a real score based on readability, formatting & completeness' },
-                    { icon: <ShieldCheck className="w-4 h-4 text-emerald-400" />, title: 'Privacy First', desc: 'Your resume never touches our servers — 100% client-side' },
+                    {
+                      icon: <ShieldCheck className="w-4 h-4 text-emerald-400" />,
+                      title: 'Privacy First',
+                      desc: hasAI
+                        ? state.aiConfig.provider === 'ollama'
+                          ? 'Ollama runs locally — your resume never leaves your machine'
+                          : `Resume text is sent directly to ${state.aiConfig.provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} using your key — no intermediate server`
+                        : 'Your resume never touches our servers — 100% client-side',
+                    },
                   ].map(f => (
                     <div key={f.title} className="bg-[#1a1d27] border border-[#2e3347] rounded-xl p-4">
                       <div className="flex items-center gap-2 mb-2">{f.icon}<h4 className="text-sm font-medium text-slate-200">{f.title}</h4></div>
