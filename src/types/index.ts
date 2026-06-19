@@ -104,16 +104,63 @@ export interface AppState {
   atsScore: AtsScore | null
   optimizedResume: OptimizedResume | null
   coverLetter: string
+  interviewPrediction: InterviewPrediction | null
+  salaryEstimate: SalaryEstimate | null
   isLoading: boolean
   loadingMessage: string
   error: string | null
 }
+
+// ─── Interview Prediction ──────────────────────────────────────────────────────
+
+export interface InterviewQuestion {
+  question: string
+  category: 'behavioral' | 'technical' | 'role-specific' | 'culture-fit' | 'situational'
+  difficulty: 'easy' | 'medium' | 'hard'
+  tip: string
+}
+
+export interface InterviewPrediction {
+  questions: InterviewQuestion[]
+  focusAreas: string[]
+  keyStrengths: string[]
+  warningAreas: string[]
+}
+
+// ─── Salary Estimation ────────────────────────────────────────────────────────
+
+export interface SalaryRange {
+  low: number
+  median: number
+  high: number
+  currency: string
+}
+
+export interface SalaryFactor {
+  factor: string
+  impact: 'positive' | 'negative' | 'neutral'
+  note: string
+}
+
+export interface SalaryEstimate {
+  base: SalaryRange
+  totalComp: SalaryRange
+  experienceLevel: string
+  location: string
+  factors: SalaryFactor[]
+  negotiationTips: string[]
+  disclaimer: string
+}
+
+// ─── App Steps ────────────────────────────────────────────────────────────────
 
 export type AppStep =
   | 'upload'
   | 'ats-view'
   | 'job-description'
   | 'analysis'
+  | 'interview'
+  | 'salary'
   | 'optimize'
   | 'diff'
   | 'export'

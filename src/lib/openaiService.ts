@@ -1,4 +1,4 @@
-import type { ResumeData, JobDescriptionData, OptimizedResume, OptimizationChange } from '../types'
+import type { ResumeData, JobDescriptionData, OptimizedResume, OptimizationChange, InterviewPrediction, SalaryEstimate } from '../types'
 import { getSectionOrder, SECTION_TITLES } from './resumeTypeDetector'
 import { callAI } from './aiProvider'
 import type { AIConfig } from './aiProvider'
@@ -469,4 +469,123 @@ Key Responsibilities: ${jobData.responsibilities.slice(0, 5).join(' | ')}
 Write the complete cover letter now (no brackets, no placeholders):`
 
   return callAI(config, system, user, 0.6)
+}
+
+// ─── Stage 6: Interview Question Predictor ───────────────────────────────────
+
+export async function predictInterviewQuestionsWithAI(
+  config: AIConfig,
+  resumeData: ResumeData,
+  jobData: JobDescriptionData | null,
+): Promise<InterviewPrediction> {
+  const system = `You are an expert interview coach and technical recruiting specialist with 15+ years of experience.
+Analyze the candidate's background against the target role and predict the most likely interview questions.
+Consider the candidate's experience gaps, standout achievements, and the role's technical requirements.
+Return ONLY valid JSON — no markdown fences, no explanation.`
+
+  const user = `Predict likely interview questions for this candidate and role.
+
+=== CANDIDATE RESUME ===
+${(resumeData.rawText || '').slice(0, 3000)}
+
+=== STRUCTURED DATA ===
+Most Recent: ${resumeData.experience[0]?.title ?? 'N/A'} at ${resumeData.experience[0]?.company ?? 'N/A'}
+Positions: ${resumeData.experience.length}
+Skills: ${resumeData.skills.slice(0, 15).join(', ')}
+Certifications: ${resumeData.certifications.join(', ')}
+
+${jobData
+  ? `=== TARGET ROLE ===
+Role: ${jobData.title}${jobData.company ? ` at ${jobData.company}` : ''}
+Required Skills: ${jobData.requiredSkills.join(', ')}
+Technologies: ${jobData.technologies.join(', ')}
+Responsibilities: ${jobData.responsibilities.slice(0, 5).join(' | ')}`
+  : '=== NO JOB DESCRIPTION — predict questions based on candidate background and most recent role ==='
+}
+
+Return ONLY this JSON structure (12-15 questions, 3-5 items each for the arrays):
+{
+  "questions": [
+    {
+      "question": "the actual interview question",
+      "category": "behavioral" | "technical" | "role-specific" | "culture-fit" | "situational",
+      "difficulty": "easy" | "medium" | "hard",
+      "tip": "1-2 sentence specific tip for answering this question well"
+    }
+  ],
+  "focusAreas": ["area to prepare", ...],
+  "keyStrengths": ["strength to highlight", ...],
+  "warningAreas": ["potential weakness or gap to address", ...]
+}`
+
+  const raw = await callAI(config, system, user, 0.7)
+  try {
+    const cleaned = raw.replace(/^```(?:json)?\n?|```\s*$/gm, '').trim()
+    return JSON.parse(cleaned) as InterviewPrediction
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (match) {
+      try { return JSON.parse(match[0]) as InterviewPrediction } catch { /* fall through */ }
+    }
+    throw new Error('Failed to parse interview prediction response.')
+  }
+}
+
+// ─── Stage 7: Salary Range Estimator ─────────────────────────────────────────
+
+export async function estimateSalaryWithAI(
+  config: AIConfig,
+  resumeData: ResumeData,
+  jobData: JobDescriptionData | null,
+): Promise<SalaryEstimate> {
+  const system = `You are a compensation expert with current knowledge of salary data from levels.fyi, Glassdoor, LinkedIn Salary, and the U.S. Bureau of Labor Statistics.
+Analyze the candidate's experience level, skills, and target role to estimate realistic salary ranges.
+Be realistic — base ranges on market data, not aspirational numbers.
+Return ONLY valid JSON — no markdown fences, no explanation.`
+
+  const user = `Estimate salary ranges for this candidate and role.
+
+=== CANDIDATE RESUME ===
+${(resumeData.rawText || '').slice(0, 2500)}
+
+=== STRUCTURED DATA ===
+Most Recent: ${resumeData.experience[0]?.title ?? 'N/A'} at ${resumeData.experience[0]?.company ?? 'N/A'}
+Positions: ${resumeData.experience.length}
+Skills: ${resumeData.skills.slice(0, 15).join(', ')}
+Education: ${resumeData.education.map(e => `${e.degree} from ${e.institution}`).join(', ')}
+Certifications: ${resumeData.certifications.join(', ')}
+Location: ${resumeData.location || 'Not specified'}
+
+${jobData
+  ? `=== TARGET ROLE ===
+Role: ${jobData.title}${jobData.company ? ` at ${jobData.company}` : ''}
+Required Skills: ${jobData.requiredSkills.join(', ')}
+Technologies: ${jobData.technologies.join(', ')}`
+  : '=== NO JOB DESCRIPTION — estimate based on candidate\'s most recent role and experience level ==='
+}
+
+Return ONLY this JSON structure (all salary figures as whole-number integers, USD):
+{
+  "base": { "low": 0, "median": 0, "high": 0, "currency": "USD" },
+  "totalComp": { "low": 0, "median": 0, "high": 0, "currency": "USD" },
+  "experienceLevel": "e.g. Mid-Level, Senior, Staff/Principal",
+  "location": "derived from resume/job or 'United States (National Average)'",
+  "factors": [
+    { "factor": "factor name", "impact": "positive" | "negative" | "neutral", "note": "brief explanation" }
+  ],
+  "negotiationTips": ["actionable tip", ...],
+  "disclaimer": "These are market estimates based on publicly available compensation data and may not reflect actual offers. Compensation varies significantly by company size, location, and negotiation."
+}`
+
+  const raw = await callAI(config, system, user, 0.3)
+  try {
+    const cleaned = raw.replace(/^```(?:json)?\n?|```\s*$/gm, '').trim()
+    return JSON.parse(cleaned) as SalaryEstimate
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (match) {
+      try { return JSON.parse(match[0]) as SalaryEstimate } catch { /* fall through */ }
+    }
+    throw new Error('Failed to parse salary estimation response.')
+  }
 }

@@ -3,6 +3,7 @@ import {
   Upload, Eye, Briefcase, Hash, Target, Wand2,
   GitCompare, Download, Mail, KeyRound, RotateCcw,
   ChevronRight, Check, Sparkles, ShieldCheck,
+  MessageSquare, DollarSign,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -16,7 +17,12 @@ import { ResumeOptimizer } from '@/components/ResumeOptimizer'
 import { DiffViewer } from '@/components/DiffViewer'
 import { ExportOptions } from '@/components/ExportOptions'
 import { CoverLetterGenerator } from '@/components/CoverLetterGenerator'
-import type { AppState, AppStep, ResumeData, JobDescriptionData, OptimizedResume, KeywordAnalysis as KeywordAnalysisType } from '@/types'
+import { InterviewPredictor } from '@/components/InterviewPredictor'
+import { SalaryEstimator } from '@/components/SalaryEstimator'
+import type {
+  AppState, AppStep, ResumeData, JobDescriptionData, OptimizedResume,
+  KeywordAnalysis as KeywordAnalysisType, InterviewPrediction, SalaryEstimate,
+} from '@/types'
 import { scoreResume } from '@/lib/atsAnalyzer'
 import { analyzeKeywords } from '@/lib/keywordMatcher'
 import { parseResumeLocal } from '@/lib/openaiService'
@@ -36,6 +42,8 @@ const initialState: AppState = {
   atsScore: null,
   optimizedResume: null,
   coverLetter: '',
+  interviewPrediction: null,
+  salaryEstimate: null,
   isLoading: false,
   loadingMessage: '',
   error: null,
@@ -49,6 +57,8 @@ type Action =
   | { type: 'MERGE_KEYWORD_AI'; payload: Partial<KeywordAnalysisType> }
   | { type: 'SET_OPTIMIZED'; payload: OptimizedResume }
   | { type: 'SET_COVER_LETTER'; payload: string }
+  | { type: 'SET_INTERVIEW_PREDICTION'; payload: InterviewPrediction }
+  | { type: 'SET_SALARY_ESTIMATE'; payload: SalaryEstimate }
   | { type: 'SET_STEP'; payload: AppStep }
   | { type: 'SET_LOADING'; payload: { loading: boolean; message?: string } }
   | { type: 'SET_ERROR'; payload: string | null }
@@ -103,6 +113,12 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_COVER_LETTER':
       return { ...state, coverLetter: action.payload }
 
+    case 'SET_INTERVIEW_PREDICTION':
+      return { ...state, interviewPrediction: action.payload }
+
+    case 'SET_SALARY_ESTIMATE':
+      return { ...state, salaryEstimate: action.payload }
+
     case 'SET_STEP':
       return { ...state, step: action.payload }
 
@@ -121,13 +137,15 @@ function reducer(state: AppState, action: Action): AppState {
 }
 
 const STEPS: { id: AppStep; label: string; icon: React.ReactNode; requiresResume?: boolean }[] = [
-  { id: 'upload', label: 'Upload', icon: <Upload className="w-4 h-4" /> },
-  { id: 'ats-view', label: 'ATS View', icon: <Eye className="w-4 h-4" />, requiresResume: true },
-  { id: 'job-description', label: 'Job', icon: <Briefcase className="w-4 h-4" />, requiresResume: true },
-  { id: 'analysis', label: 'Analysis', icon: <Hash className="w-4 h-4" />, requiresResume: true },
-  { id: 'optimize', label: 'Optimize', icon: <Wand2 className="w-4 h-4" />, requiresResume: true },
-  { id: 'diff', label: 'Diff', icon: <GitCompare className="w-4 h-4" />, requiresResume: true },
-  { id: 'export', label: 'Export', icon: <Download className="w-4 h-4" />, requiresResume: true },
+  { id: 'upload',          label: 'Upload',    icon: <Upload className="w-4 h-4" /> },
+  { id: 'ats-view',        label: 'ATS View',  icon: <Eye className="w-4 h-4" />,          requiresResume: true },
+  { id: 'job-description', label: 'Job',        icon: <Briefcase className="w-4 h-4" />,    requiresResume: true },
+  { id: 'analysis',        label: 'Analysis',  icon: <Hash className="w-4 h-4" />,          requiresResume: true },
+  { id: 'interview',       label: 'Interview', icon: <MessageSquare className="w-4 h-4" />, requiresResume: true },
+  { id: 'salary',          label: 'Salary',    icon: <DollarSign className="w-4 h-4" />,    requiresResume: true },
+  { id: 'optimize',        label: 'Optimize',  icon: <Wand2 className="w-4 h-4" />,         requiresResume: true },
+  { id: 'diff',            label: 'Diff',      icon: <GitCompare className="w-4 h-4" />,    requiresResume: true },
+  { id: 'export',          label: 'Export',    icon: <Download className="w-4 h-4" />,      requiresResume: true },
 ]
 
 export default function App() {
@@ -314,7 +332,7 @@ export default function App() {
 
             {/* Analysis */}
             {state.step === 'analysis' && hasResume && (
-              <StepWrapper title="Analysis Dashboard" subtitle="ATS score, keyword gaps, and actionable insights." icon={<Hash className="w-5 h-5 text-amber-400" />} nextStep={() => setStep('optimize')} nextLabel="Optimize Resume →">
+              <StepWrapper title="Analysis Dashboard" subtitle="ATS score, keyword gaps, and actionable insights." icon={<Hash className="w-5 h-5 text-amber-400" />} nextStep={() => setStep('interview')} nextLabel="Interview Prep →">
                 <div className="space-y-6">
                   {state.atsScore && (
                     <section>
@@ -336,6 +354,44 @@ export default function App() {
                     </div>
                   )}
                 </div>
+              </StepWrapper>
+            )}
+
+            {/* Interview Predictor */}
+            {state.step === 'interview' && hasResume && state.resumeData && (
+              <StepWrapper
+                title="Interview Question Predictor"
+                subtitle="AI predicts the questions most likely to come up based on your resume and target role."
+                icon={<MessageSquare className="w-5 h-5 text-violet-400" />}
+                nextStep={() => setStep('salary')}
+                nextLabel="Salary Estimator →"
+              >
+                <InterviewPredictor
+                  aiConfig={state.aiConfig}
+                  resumeData={state.resumeData}
+                  jobData={state.jobData}
+                  prediction={state.interviewPrediction}
+                  onGenerated={result => dispatch({ type: 'SET_INTERVIEW_PREDICTION', payload: result })}
+                />
+              </StepWrapper>
+            )}
+
+            {/* Salary Estimator */}
+            {state.step === 'salary' && hasResume && state.resumeData && (
+              <StepWrapper
+                title="Salary Range Estimator"
+                subtitle="AI estimates your market value based on experience, skills, and the target role."
+                icon={<DollarSign className="w-5 h-5 text-emerald-400" />}
+                nextStep={() => setStep('optimize')}
+                nextLabel="Optimize Resume →"
+              >
+                <SalaryEstimator
+                  aiConfig={state.aiConfig}
+                  resumeData={state.resumeData}
+                  jobData={state.jobData}
+                  estimate={state.salaryEstimate}
+                  onGenerated={result => dispatch({ type: 'SET_SALARY_ESTIMATE', payload: result })}
+                />
               </StepWrapper>
             )}
 
@@ -389,6 +445,12 @@ export default function App() {
                 <Upload className="w-12 h-12 mx-auto mb-4 text-slate-700" />
                 <p className="text-slate-500 mb-4">Please upload your resume first.</p>
                 <Button onClick={() => setStep('upload')}>Upload Resume</Button>
+              </div>
+            )}
+            {(state.step === 'interview' || state.step === 'salary') && hasResume && !state.resumeData && (
+              <div className="text-center py-16">
+                <Sparkles className="w-12 h-12 mx-auto mb-4 text-slate-700" />
+                <p className="text-slate-500 mb-4">Resume data is still loading...</p>
               </div>
             )}
             {state.step === 'diff' && !state.optimizedResume && hasResume && (
