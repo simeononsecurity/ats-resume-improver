@@ -267,10 +267,8 @@ Name: ${resumeData.name} | Email: ${resumeData.email} | Phone: ${resumeData.phon
 Skills: ${resumeData.skills.join(', ')}
 ${resumeData.experience.length} experience entries | ${resumeData.education.length} education entries
 
-RETURN this exact JSON (no markdown):
+RETURN this exact JSON (no markdown). structuredData MUST include ALL experience entries with ALL bullets rewritten:
 {
-  "atsVersion": "COMPLETE ATS-formatted resume as plain text",
-  "tailoredVersion": "COMPLETE tailored resume for target job",
   "changes": [{"section":"","original":"","updated":"","reason":""}],
   "structuredData": {
     "name":"","email":"","phone":"","location":"","summary":"",
@@ -283,13 +281,36 @@ RETURN this exact JSON (no markdown):
   const raw = await callAI(config, system, user, 0.3)
   try {
     const parsed = JSON.parse(raw)
-    return { ...parsed, structuredData: { ...parsed.structuredData, rawText: resumeData.rawText } } as OptimizedResume
+    const sd: ResumeData = { ...resumeData, ...parsed.structuredData, rawText: resumeData.rawText }
+    // Always rebuild atsVersion/tailoredVersion deterministically from structuredData
+    // so the output is always complete regardless of AI response length
+    const atsVersion = buildAtsVersion([], sd)
+    const missingKwAppendix = missingKeywords.length > 0
+      ? `\n\nSUGGESTED KEYWORDS TO INTEGRATE\n${'─'.repeat(50)}\n` +
+        `Review these keywords from the job description. If you have genuine experience with any,\n` +
+        `naturally incorporate them into your existing bullet points using this format:\n` +
+        `"[Action Verb] [keyword/tool] to [what you did], resulting in [measurable outcome]"\n\n` +
+        `Keywords: ${missingKeywords.slice(0, 20).join(', ')}`
+      : ''
+    return {
+      atsVersion,
+      tailoredVersion: atsVersion + missingKwAppendix,
+      changes: parsed.changes || [],
+      structuredData: sd,
+    } as OptimizedResume
   } catch {
     const match = raw.match(/\{[\s\S]*\}/)
     if (match) {
       try {
         const parsed = JSON.parse(match[0])
-        return { ...parsed, structuredData: { ...parsed.structuredData, rawText: resumeData.rawText } } as OptimizedResume
+        const sd: ResumeData = { ...resumeData, ...parsed.structuredData, rawText: resumeData.rawText }
+        const atsVersion = buildAtsVersion([], sd)
+        return {
+          atsVersion,
+          tailoredVersion: atsVersion,
+          changes: parsed.changes || [],
+          structuredData: sd,
+        } as OptimizedResume
       } catch { /* fall through */ }
     }
     throw new Error('AI returned unexpected optimization format.')
