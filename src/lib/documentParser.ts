@@ -1,5 +1,9 @@
 // Document parser - extracts text from PDF, DOCX, and TXT files
 
+// Import the PDF.js worker as a local asset URL (Vite bundles it into dist)
+// This avoids fetching from CDN which can fail due to CSP, offline usage, or version mismatch
+import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+
 export async function parseDocument(file: File): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase()
 
@@ -16,8 +20,8 @@ export async function parseDocument(file: File): Promise<string> {
 
 async function parsePDF(file: File): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist')
-  // Use the worker from CDN to avoid bundling issues
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+  // Use the locally bundled worker (copied to dist by Vite) — no CDN dependency
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl
 
   const arrayBuffer = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
