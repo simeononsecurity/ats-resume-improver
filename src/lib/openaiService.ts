@@ -267,34 +267,50 @@ Name: ${resumeData.name} | Email: ${resumeData.email} | Phone: ${resumeData.phon
 Skills: ${resumeData.skills.join(', ')}
 ${resumeData.experience.length} experience entries | ${resumeData.education.length} education entries
 
-RETURN this exact JSON (no markdown). structuredData MUST include ALL experience entries with ALL bullets rewritten:
+RETURN this exact JSON (no markdown). Output structuredData FIRST — it is the most important field.
+structuredData MUST include EVERY experience entry with ALL bullets, EVERY education entry, ALL skills and certifications:
 {
-  "changes": [{"section":"","original":"","updated":"","reason":""}],
   "structuredData": {
     "name":"","email":"","phone":"","location":"","summary":"",
     "experience":[{"title":"","company":"","startDate":"","endDate":"","bullets":[]}],
     "education":[{"degree":"","institution":"","year":"","gpa":""}],
     "skills":[],"certifications":[],"rawText":""
-  }
+  },
+  "changes": [{"section":"","original":"","updated":"","reason":""}]
 }`
 
   const raw = await callAI(config, system, user, 0.3)
+
+  function mergeWithFallback(aiSd: Partial<ResumeData>): ResumeData {
+    // Never let an empty AI array override real data from the original parse
+    return {
+      ...resumeData,
+      name: aiSd.name || resumeData.name,
+      location: aiSd.location || resumeData.location,
+      summary: aiSd.summary || resumeData.summary,
+      skills: (aiSd.skills?.length ?? 0) > 0 ? aiSd.skills! : resumeData.skills,
+      certifications: (aiSd.certifications?.length ?? 0) > 0 ? aiSd.certifications! : resumeData.certifications,
+      experience: (aiSd.experience?.length ?? 0) > 0 ? aiSd.experience! : resumeData.experience,
+      education: (aiSd.education?.length ?? 0) > 0 ? aiSd.education! : resumeData.education,
+      rawText: resumeData.rawText,
+    }
+  }
+
+  const kwAppendix = missingKeywords.length > 0
+    ? `\n\nSUGGESTED KEYWORDS TO INTEGRATE\n${'─'.repeat(50)}\n` +
+      `Review these keywords from the job description. If you have genuine experience with any,\n` +
+      `naturally incorporate them into your existing bullet points using this format:\n` +
+      `"[Action Verb] [keyword/tool] to [what you did], resulting in [measurable outcome]"\n\n` +
+      `Keywords: ${missingKeywords.slice(0, 20).join(', ')}`
+    : ''
+
   try {
     const parsed = JSON.parse(raw)
-    const sd: ResumeData = { ...resumeData, ...parsed.structuredData, rawText: resumeData.rawText }
-    // Always rebuild atsVersion/tailoredVersion deterministically from structuredData
-    // so the output is always complete regardless of AI response length
+    const sd = mergeWithFallback(parsed.structuredData || {})
     const atsVersion = buildAtsVersion([], sd)
-    const missingKwAppendix = missingKeywords.length > 0
-      ? `\n\nSUGGESTED KEYWORDS TO INTEGRATE\n${'─'.repeat(50)}\n` +
-        `Review these keywords from the job description. If you have genuine experience with any,\n` +
-        `naturally incorporate them into your existing bullet points using this format:\n` +
-        `"[Action Verb] [keyword/tool] to [what you did], resulting in [measurable outcome]"\n\n` +
-        `Keywords: ${missingKeywords.slice(0, 20).join(', ')}`
-      : ''
     return {
       atsVersion,
-      tailoredVersion: atsVersion + missingKwAppendix,
+      tailoredVersion: atsVersion + kwAppendix,
       changes: parsed.changes || [],
       structuredData: sd,
     } as OptimizedResume
@@ -303,11 +319,11 @@ RETURN this exact JSON (no markdown). structuredData MUST include ALL experience
     if (match) {
       try {
         const parsed = JSON.parse(match[0])
-        const sd: ResumeData = { ...resumeData, ...parsed.structuredData, rawText: resumeData.rawText }
+        const sd = mergeWithFallback(parsed.structuredData || {})
         const atsVersion = buildAtsVersion([], sd)
         return {
           atsVersion,
-          tailoredVersion: atsVersion,
+          tailoredVersion: atsVersion + kwAppendix,
           changes: parsed.changes || [],
           structuredData: sd,
         } as OptimizedResume
@@ -346,54 +362,85 @@ export function optimizeResumeLocal(resumeData: ResumeData, missingKeywords: str
   return { atsVersion, tailoredVersion, changes, structuredData: resumeData }
 }
 
-function buildAtsVersion(_improvedLines: string[], resumeData: ResumeData): string {
-  if (resumeData.experience.length > 0 || resumeData.skills.length > 0 || resumeData.education.length > 0) {
-    const order = getSectionOrder(resumeData)
-    const DIV = '─'.repeat(50)
-    const lines: string[] = []
-    if (resumeData.name) lines.push(resumeData.name.toUpperCase())
-    const contact = [resumeData.email, resumeData.phone, resumeData.location].filter(Boolean)
-    if (contact.length) lines.push(contact.join(' | '))
-    lines.push('')
-    for (const section of order) {
-      switch (section) {
-        case 'summary':
-          if (resumeData.summary) { lines.push(SECTION_TITLES.summary, DIV, resumeData.summary, '') }
-          break
-        case 'experience':
-          if (resumeData.experience.length > 0) {
-            lines.push(SECTION_TITLES.experience, DIV)
-            for (const exp of resumeData.experience) {
-              lines.push('', `${exp.title} | ${exp.company}`, `${exp.startDate}${exp.endDate ? ' – ' + exp.endDate : ' – Present'}`)
-              for (const bullet of exp.bullets) lines.push(`• ${improveBullet(bullet, [])}`)
-            }
-            lines.push('')
-          }
-          break
-        case 'education':
-          if (resumeData.education.length > 0) {
-            lines.push(SECTION_TITLES.education, DIV)
-            for (const edu of resumeData.education) {
-              lines.push(`${edu.degree} | ${edu.institution}${edu.year ? ' | ' + edu.year : ''}${edu.gpa ? ' | GPA: ' + edu.gpa : ''}`)
-            }
-            lines.push('')
-          }
-          break
-        case 'skills':
-          if (resumeData.skills.length > 0) { lines.push(SECTION_TITLES.skills, DIV, resumeData.skills.join(' • '), '') }
-          break
-        case 'certifications':
-          if (resumeData.certifications.length > 0) {
-            lines.push(SECTION_TITLES.certifications, DIV)
-            for (const cert of resumeData.certifications) lines.push(`• ${cert}`)
-            lines.push('')
-          }
-          break
-      }
-    }
-    return lines.join('\n')
+/** Extract raw lines belonging to a section from rawText (between two header patterns). */
+function extractRawSection(rawText: string, startPattern: RegExp, endPattern: RegExp): string[] {
+  const allLines = rawText.split('\n')
+  const result: string[] = []
+  let inside = false
+  for (const line of allLines) {
+    const trimmed = line.trim()
+    if (!inside && startPattern.test(trimmed)) { inside = true; continue }
+    if (inside && endPattern.test(trimmed)) break
+    if (inside) result.push(line)
   }
-  return _improvedLines.join('\n')
+  return result.filter(l => l.trim())
+}
+
+function buildAtsVersion(_improvedLines: string[], resumeData: ResumeData): string {
+  const rawText = resumeData.rawText || ''
+  const order = getSectionOrder(resumeData)
+  const DIV = '─'.repeat(50)
+  const lines: string[] = []
+
+  if (resumeData.name) lines.push(resumeData.name.toUpperCase())
+  const contact = [resumeData.email, resumeData.phone, resumeData.location].filter(Boolean)
+  if (contact.length) lines.push(contact.join(' | '))
+  lines.push('')
+
+  for (const section of order) {
+    switch (section) {
+      case 'summary':
+        if (resumeData.summary) { lines.push(SECTION_TITLES.summary, DIV, resumeData.summary, '') }
+        break
+      case 'experience':
+        if (resumeData.experience.length > 0) {
+          lines.push(SECTION_TITLES.experience, DIV)
+          for (const exp of resumeData.experience) {
+            lines.push('', `${exp.title} | ${exp.company}`, `${exp.startDate}${exp.endDate ? ' – ' + exp.endDate : ' – Present'}`)
+            for (const bullet of exp.bullets) lines.push(`• ${improveBullet(bullet, [])}`)
+          }
+          lines.push('')
+        } else {
+          // Structured parse found nothing — extract raw section verbatim
+          const raw = extractRawSection(rawText,
+            /^(professional experience|work history|employment history|experience)/i,
+            /^(education|skills|certifications?|projects?|summary|objective)/i)
+          if (raw.length > 0) { lines.push(SECTION_TITLES.experience, DIV, ...raw, '') }
+        }
+        break
+      case 'education':
+        if (resumeData.education.length > 0) {
+          lines.push(SECTION_TITLES.education, DIV)
+          for (const edu of resumeData.education) {
+            lines.push(`${edu.degree} | ${edu.institution}${edu.year ? ' | ' + edu.year : ''}${edu.gpa ? ' | GPA: ' + edu.gpa : ''}`)
+          }
+          lines.push('')
+        } else {
+          const raw = extractRawSection(rawText,
+            /^education/i,
+            /^(experience|skills|certifications?|projects?|summary|objective)/i)
+          if (raw.length > 0) { lines.push(SECTION_TITLES.education, DIV, ...raw, '') }
+        }
+        break
+      case 'skills':
+        if (resumeData.skills.length > 0) { lines.push(SECTION_TITLES.skills, DIV, resumeData.skills.join(' • '), '') }
+        break
+      case 'certifications':
+        if (resumeData.certifications.length > 0) {
+          lines.push(SECTION_TITLES.certifications, DIV)
+          for (const cert of resumeData.certifications) lines.push(`• ${cert}`)
+          lines.push('')
+        }
+        break
+    }
+  }
+
+  const output = lines.join('\n').trim()
+  // Final safety net: if somehow everything is empty, return the raw text as-is
+  if (!output || output.split('\n').filter(l => l.trim()).length < 5) {
+    return rawText
+  }
+  return output
 }
 
 function improveBullet(bullet: string, changes: OptimizationChange[]): string {
