@@ -309,6 +309,25 @@ ats-resume-improver/
 - [ ] LinkedIn profile optimizer
 - [ ] Google Gemini provider support
 
+## ✍️ Cover Letter Humanizer
+
+The cover letter generator applies a writing style guide designed to eliminate the telltale signs of AI-generated text — em dashes, buzzword lists, robotic sentence rhythm, and passive constructions. The humanization rules are directly inspired by:
+
+> **Sabrina Ramonov** — *"Best AI Prompt to Humanize AI Writing"*
+> [https://www.sabrina.dev/p/best-ai-prompt-to-humanize-ai-writing](https://www.sabrina.dev/p/best-ai-prompt-to-humanize-ai-writing)
+
+Key rules applied to every generated cover letter:
+
+- **No em dashes** (strongest single AI giveaway — removed entirely)
+- **50+ banned words/phrases**: leverage, utilize, dive deep, delve, embark, game-changer, groundbreaking, cutting-edge, pivotal, tapestry, harness, moreover, in conclusion, it's worth noting, ever-evolving, landscape, testament, not only...but also, and many more
+- **No markdown** in letter body — no bold asterisks, hashtags, or semicolons
+- **Active voice** by default; passive only when the actor genuinely doesn't matter
+- **Contractions required**: "I've", "I'm", "it's" — not "I have", "I am", "it is"
+- **Vary sentence length** — short punchy sentences mixed with longer ones
+- **Cut filler openers** — "It's important to note that X" → just say X
+- **One informal transition** allowed if it fits naturally
+- **Concrete job-posting detail** in paragraph 1 — proves the letter wasn't templated
+
 ## 🤝 Contributing
 
 Pull requests are welcome. For major changes, open an issue first. See the [GitHub repo](https://github.com/simeononsecurity/ats-resume-improver) for the latest.

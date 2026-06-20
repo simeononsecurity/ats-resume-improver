@@ -102,6 +102,18 @@ export function buildTXTFromData(resumeData: ResumeData, customOrder?: SectionKe
     }
   }
 
+  if (resumeData.projects && resumeData.projects.length > 0) {
+    lines.push('PROJECTS')
+    lines.push(DIV)
+    for (const proj of resumeData.projects) {
+      lines.push('')
+      lines.push(proj.technologies?.length ? `${proj.name}  |  ${proj.technologies.join(', ')}` : proj.name)
+      if (proj.description) lines.push(...wordWrap(`  ${proj.description}`, 70))
+      if (proj.url) lines.push(`  ${proj.url}`)
+    }
+    lines.push('')
+  }
+
   lines.push(SEP)
   return lines.join('\n')
 }
@@ -160,11 +172,22 @@ export function exportMarkdown(resumeData: ResumeData, fileName = 'resume-ats.md
     }
   }
 
+  if (resumeData.projects && resumeData.projects.length > 0) {
+    lines.push('## Projects'); lines.push('')
+    for (const proj of resumeData.projects) {
+      const tech = proj.technologies?.length ? ` — *${proj.technologies.join(', ')}*` : ''
+      lines.push(`### ${proj.name}${tech}`)
+      if (proj.description) lines.push(proj.description)
+      if (proj.url) lines.push(`[${proj.url}](${proj.url})`)
+      lines.push('')
+    }
+  }
+
   const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
   downloadBlob(blob, fileName)
 }
 
-// ─── PDF Export — Professional Template with Section Ordering ─────────────────
+// ─── PDF Export — Professional Template ───────────────────────────────────────
 
 export async function exportPDF(
   content: string,
@@ -176,95 +199,128 @@ export async function exportPDF(
 
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
-  const mL = 50, mR = 50, mT = 45, mB = 45
+  const mL = 54, mR = 54, mT = 48, mB = 48
   const cW = pageWidth - mL - mR
 
-  const BLACK: [number, number, number] = [15, 15, 15]
-  const HDR: [number, number, number] = [40, 40, 120]
-  const MUTED: [number, number, number] = [100, 100, 100]
-  const RULE: [number, number, number] = [180, 180, 210]
+  // Color palette
+  const NAVY: [number, number, number] = [26, 44, 90]
+  const BLUE: [number, number, number] = [37, 99, 200]
+  const BLACK: [number, number, number] = [17, 24, 39]
+  const GRAY: [number, number, number] = [107, 114, 128]
+  const RULE_LIGHT: [number, number, number] = [200, 210, 225]
 
   let y = mT
   const np = () => { doc.addPage(); y = mT }
   const chk = (n: number) => { if (y + n > pageHeight - mB) np() }
 
+  const body = (t: string, ind = 0, fs = 9.5, color: [number, number, number] = BLACK) => {
+    doc.setFont('helvetica', 'normal').setFontSize(fs).setTextColor(...color)
+    for (const l of doc.splitTextToSize(t, cW - ind)) {
+      chk(14); doc.text(l, mL + ind, y); y += 13
+    }
+  }
+
   if (resumeData && resumeData.name) {
     const order = getSectionOrder(resumeData)
 
-    // ── Header ──
-    doc.setFont('helvetica', 'bold').setFontSize(24).setTextColor(...HDR)
-    doc.text(resumeData.name || 'Resume', mL, y); y += 28
+    // ── Name ──
+    doc.setFont('helvetica', 'bold').setFontSize(26).setTextColor(...NAVY)
+    doc.text((resumeData.name || 'Resume').toUpperCase(), mL, y); y += 30
+
+    // ── Contact bar ──
     const c = [resumeData.email, resumeData.phone, resumeData.location].filter(Boolean)
     if (c.length) {
-      doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...MUTED)
-      doc.text(c.join('   |   '), mL, y); y += 14
+      doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...GRAY)
+      doc.text(c.join('   •   '), mL, y); y += 14
     }
-    doc.setDrawColor(...RULE).setLineWidth(1.5).line(mL, y, pageWidth - mR, y); y += 14
 
+    // ── Thick accent rule ──
+    doc.setDrawColor(...BLUE).setLineWidth(2.5).line(mL, y + 2, pageWidth - mR, y + 2); y += 16
+
+    // ── Section header helper ──
     const sec = (t: string) => {
-      chk(30)
-      doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(...HDR)
-      doc.text(t, mL, y); y += 4
-      doc.setDrawColor(...RULE).setLineWidth(0.5).line(mL, y, pageWidth - mR, y); y += 10
+      chk(36)
+      y += 12
+      doc.setFont('helvetica', 'bold').setFontSize(10.5).setTextColor(...NAVY)
+      doc.text(t, mL, y); y += 5
+      doc.setDrawColor(...BLUE).setLineWidth(1).line(mL, y, pageWidth - mR, y); y += 10
     }
 
-    const body = (t: string, ind = 0, fs = 9.5) => {
-      doc.setFont('helvetica', 'normal').setFontSize(fs).setTextColor(...BLACK)
-      for (const l of doc.splitTextToSize(t, cW - ind)) {
-        chk(14); doc.text(l, mL + ind, y); y += 13
-      }
-    }
-
-    // ── Sections in detected order ──
     for (const section of order) {
       switch (section) {
         case 'summary':
-          if (resumeData.summary) { sec(SECTION_TITLES.summary); body(resumeData.summary); y += 6 }
+          if (resumeData.summary) {
+            sec(SECTION_TITLES.summary)
+            body(resumeData.summary)
+            y += 4
+          }
           break
+
         case 'experience':
           if (resumeData.experience.length > 0) {
             sec(SECTION_TITLES.experience)
             for (const exp of resumeData.experience) {
-              chk(40)
-              doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(...BLACK)
-              doc.text(`${exp.title}  |  ${exp.company}`, mL, y); y += 13
-              doc.setFont('helvetica', 'italic').setFontSize(8.5).setTextColor(...MUTED)
-              doc.text(`${exp.startDate} – ${exp.endDate || 'Present'}`, mL, y); y += 11
+              chk(50)
+              y += 6
+              // Title: bold navy
+              doc.setFont('helvetica', 'bold').setFontSize(10.5).setTextColor(...NAVY)
+              doc.text(exp.title, mL, y)
+              // Company: same line after separator
+              const tW = doc.getTextWidth(exp.title)
+              doc.setFont('helvetica', 'normal').setFontSize(9.5).setTextColor(...GRAY)
+              const compSuffix = `  ·  ${exp.company}`
+              if (tW + doc.getTextWidth(compSuffix) < cW) {
+                doc.text(compSuffix, mL + tW, y)
+              } else {
+                // Overflow: render company on next line
+                y += 13
+                doc.text(exp.company, mL, y)
+              }
+              y += 14
+              // Date: italic gray
+              doc.setFont('helvetica', 'italic').setFontSize(8.5).setTextColor(...GRAY)
+              doc.text(`${exp.startDate} – ${exp.endDate || 'Present'}`, mL, y); y += 12
+              // Bullets
               for (const b of exp.bullets) {
                 chk(16)
                 doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...BLACK)
                 const ws = doc.splitTextToSize(`• ${b}`, cW - 12)
-                doc.text(ws[0], mL + 8, y); y += 12
+                doc.text(ws[0], mL + 10, y); y += 12
                 for (let i = 1; i < ws.length; i++) { chk(14); doc.text(ws[i], mL + 18, y); y += 12 }
               }
-              y += 5
+              y += 4
             }
             y += 4
           }
           break
+
         case 'education':
           if (resumeData.education.length > 0) {
             sec(SECTION_TITLES.education)
             for (const edu of resumeData.education) {
-              chk(28)
-              doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(...BLACK)
-              doc.text(edu.degree, mL, y); y += 12
-              doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...MUTED)
-              doc.text([edu.institution, edu.year, edu.gpa ? `GPA: ${edu.gpa}` : ''].filter(Boolean).join('   |   '), mL, y); y += 14
+              chk(32)
+              y += 5
+              doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(...NAVY)
+              doc.text(edu.degree, mL, y); y += 13
+              doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...GRAY)
+              const eduLine = [edu.institution, edu.year, edu.gpa ? `GPA: ${edu.gpa}` : ''].filter(Boolean).join('   •   ')
+              doc.text(eduLine, mL, y); y += 14
             }
             y += 4
           }
           break
+
         case 'skills':
           if (resumeData.skills.length > 0) {
             sec(SECTION_TITLES.skills)
             doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...BLACK)
-            for (const l of doc.splitTextToSize(resumeData.skills.join('  •  '), cW)) {
+            for (const l of doc.splitTextToSize(resumeData.skills.join('   •   '), cW)) {
               chk(13); doc.text(l, mL, y); y += 13
             }
             y += 6
           }
           break
+
         case 'certifications':
           if (resumeData.certifications.length > 0) {
             sec(SECTION_TITLES.certifications)
@@ -274,17 +330,39 @@ export async function exportPDF(
           break
       }
     }
+
+    // ── Projects ──
+    if (resumeData.projects && resumeData.projects.length > 0) {
+      sec('PROJECTS')
+      for (const proj of resumeData.projects) {
+        chk(34)
+        y += 5
+        doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(...NAVY)
+        doc.text(proj.name, mL, y)
+        if (proj.technologies?.length) {
+          const nW = doc.getTextWidth(proj.name)
+          doc.setFont('helvetica', 'normal').setFontSize(8.5).setTextColor(...GRAY)
+          doc.text(`  ·  ${proj.technologies.join(', ')}`, mL + nW, y)
+        }
+        y += 13
+        if (proj.description) body(proj.description, 0, 9)
+        if (proj.url) body(proj.url, 0, 8.5, BLUE)
+        y += 4
+      }
+    }
   } else {
-    // Fallback: render from text content
+    // Fallback: render from raw text
     for (const line of content.split('\n')) {
       const t = line.trim()
       if (/^[═─]{5,}$/.test(t)) {
-        if (y > mT + 10) { doc.setDrawColor(...RULE).setLineWidth(0.5).line(mL, y, pageWidth - mR, y); y += 8 }
+        if (y > mT + 10) {
+          doc.setDrawColor(...RULE_LIGHT).setLineWidth(0.5).line(mL, y, pageWidth - mR, y); y += 8
+        }
         continue
       }
       if (!t) { y += 7; continue }
       const isHdr = /^[A-Z\s]{4,}$/.test(t) && t.length < 50
-      if (isHdr) { chk(20); doc.setFont('helvetica', 'bold').setFontSize(10.5).setTextColor(...HDR) }
+      if (isHdr) { chk(20); doc.setFont('helvetica', 'bold').setFontSize(10.5).setTextColor(...NAVY) }
       else { chk(14); doc.setFont('helvetica', 'normal').setFontSize(9.5).setTextColor(...BLACK) }
       for (const wl of doc.splitTextToSize(t, cW)) { chk(14); doc.text(wl, mL, y); y += 13 }
     }
@@ -293,111 +371,180 @@ export async function exportPDF(
   doc.save(fileName)
 }
 
-// ─── DOCX Export — Browser-Compatible with Section Ordering ──────────────────
+// ─── DOCX Export — Professional Template ──────────────────────────────────────
 
 export async function exportDOCX(resumeData: ResumeData, fileName = 'resume-ats.docx') {
   const { Document, Paragraph, TextRun, Packer, BorderStyle } = await import('docx')
   const order = getSectionOrder(resumeData)
 
+  // Color palette (hex strings for docx)
+  const NAVY = '1a2c5a'
+  const BLUE = '2563eb'
+  const BLACK = '111827'
+  const GRAY = '6b7280'
+  const RULE = 'c7d2e0'
+
   const children: any[] = []
 
-  // Header
+  // ── Name ──
   children.push(new Paragraph({
-    children: [new TextRun({ text: (resumeData.name || 'Resume').toUpperCase(), bold: true, size: 40, color: '2a2a78' })],
-    spacing: { after: 60 },
+    children: [new TextRun({
+      text: (resumeData.name || 'Resume').toUpperCase(),
+      bold: true, size: 52, color: NAVY, font: 'Calibri',
+    })],
+    spacing: { after: 80 },
   }))
 
+  // ── Contact bar ──
   const contact = [resumeData.email, resumeData.phone, resumeData.location].filter(Boolean)
   if (contact.length) {
     children.push(new Paragraph({
-      children: [new TextRun({ text: contact.join('   |   '), size: 18, color: '666666' })],
-      spacing: { after: 120 },
+      children: [new TextRun({ text: contact.join('   •   '), size: 18, color: GRAY, font: 'Calibri' })],
+      spacing: { after: 160 },
     }))
   }
 
+  // ── Thick accent rule ──
   children.push(new Paragraph({
-    border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: 'b4b4d2' } },
-    spacing: { after: 160 },
+    border: { bottom: { style: BorderStyle.THICK, size: 24, color: BLUE } },
+    spacing: { after: 240 },
   }))
 
+  // ── Section header helper ──
   const sh = (title: string) => new Paragraph({
-    children: [new TextRun({ text: title, bold: true, size: 22, color: '2828a0', allCaps: true })],
-    border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'b4b4d2' } },
-    spacing: { before: 280, after: 120 },
+    children: [new TextRun({ text: title, bold: true, size: 22, color: NAVY, font: 'Calibri', allCaps: true })],
+    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: RULE } },
+    spacing: { before: 360, after: 160 },
   })
 
-  // Sections in detected order
   for (const section of order) {
     switch (section) {
       case 'summary':
         if (resumeData.summary) {
           children.push(sh('Professional Summary'))
-          children.push(new Paragraph({ children: [new TextRun({ text: resumeData.summary, size: 20 })], spacing: { after: 160 } }))
+          children.push(new Paragraph({
+            children: [new TextRun({ text: resumeData.summary, size: 20, color: BLACK, font: 'Calibri' })],
+            spacing: { after: 200 },
+          }))
         }
         break
+
       case 'experience':
         if (resumeData.experience.length > 0) {
           children.push(sh('Professional Experience'))
           for (const exp of resumeData.experience) {
+            // Title · Company
             children.push(new Paragraph({
               children: [
-                new TextRun({ text: exp.title, bold: true, size: 21 }),
-                new TextRun({ text: `  |  ${exp.company}`, size: 21, color: '333333' }),
+                new TextRun({ text: exp.title, bold: true, size: 22, color: NAVY, font: 'Calibri' }),
+                new TextRun({ text: '   ·   ', size: 20, color: RULE, font: 'Calibri' }),
+                new TextRun({ text: exp.company, size: 20, color: BLACK, font: 'Calibri' }),
               ],
-              spacing: { before: 180, after: 40 },
+              spacing: { before: 200, after: 40 },
             }))
+            // Dates
             children.push(new Paragraph({
-              children: [new TextRun({ text: `${exp.startDate} – ${exp.endDate || 'Present'}`, italics: true, size: 18, color: '888888' })],
+              children: [new TextRun({
+                text: `${exp.startDate} – ${exp.endDate || 'Present'}`,
+                italics: true, size: 18, color: GRAY, font: 'Calibri',
+              })],
               spacing: { after: 80 },
             }))
+            // Bullets
             for (const b of exp.bullets) {
-              children.push(new Paragraph({ children: [new TextRun({ text: b, size: 19 })], bullet: { level: 0 }, spacing: { after: 40 } }))
+              children.push(new Paragraph({
+                children: [new TextRun({ text: b, size: 19, color: BLACK, font: 'Calibri' })],
+                bullet: { level: 0 },
+                spacing: { after: 50 },
+              }))
             }
           }
         }
         break
+
       case 'education':
         if (resumeData.education.length > 0) {
           children.push(sh('Education'))
           for (const edu of resumeData.education) {
             children.push(new Paragraph({
               children: [
-                new TextRun({ text: edu.degree, bold: true, size: 20 }),
-                new TextRun({ text: `  |  ${edu.institution}`, size: 20 }),
-                new TextRun({ text: edu.year ? `  |  ${edu.year}` : '', size: 20, color: '666666' }),
-                new TextRun({ text: edu.gpa ? `  |  GPA: ${edu.gpa}` : '', size: 20, color: '666666' }),
+                new TextRun({ text: edu.degree, bold: true, size: 21, color: NAVY, font: 'Calibri' }),
+                new TextRun({ text: `   ·   ${edu.institution}`, size: 20, color: BLACK, font: 'Calibri' }),
+                new TextRun({ text: edu.year ? `   ·   ${edu.year}` : '', size: 19, color: GRAY, font: 'Calibri' }),
+                new TextRun({ text: edu.gpa ? `   ·   GPA: ${edu.gpa}` : '', size: 19, color: GRAY, font: 'Calibri' }),
               ],
-              spacing: { before: 120, after: 80 },
+              spacing: { before: 140, after: 100 },
             }))
           }
         }
         break
+
       case 'skills':
         if (resumeData.skills.length > 0) {
           children.push(sh('Skills'))
-          children.push(new Paragraph({ children: [new TextRun({ text: resumeData.skills.join('  •  '), size: 19 })], spacing: { after: 120 } }))
+          for (let i = 0; i < resumeData.skills.length; i += 5) {
+            children.push(new Paragraph({
+              children: [new TextRun({
+                text: resumeData.skills.slice(i, i + 5).join('   •   '),
+                size: 19, color: BLACK, font: 'Calibri',
+              })],
+              spacing: { after: 80 },
+            }))
+          }
         }
         break
+
       case 'certifications':
         if (resumeData.certifications.length > 0) {
           children.push(sh('Certifications'))
           for (const cert of resumeData.certifications) {
-            children.push(new Paragraph({ children: [new TextRun({ text: cert, size: 19 })], bullet: { level: 0 }, spacing: { after: 40 } }))
+            children.push(new Paragraph({
+              children: [new TextRun({ text: cert, size: 19, color: BLACK, font: 'Calibri' })],
+              bullet: { level: 0 },
+              spacing: { after: 50 },
+            }))
           }
         }
         break
     }
   }
 
+  // ── Projects ──
+  if (resumeData.projects && resumeData.projects.length > 0) {
+    children.push(sh('Projects'))
+    for (const proj of resumeData.projects) {
+      const techText = proj.technologies?.length ? `   ·   ${proj.technologies.join(', ')}` : ''
+      children.push(new Paragraph({
+        children: [
+          new TextRun({ text: proj.name, bold: true, size: 21, color: NAVY, font: 'Calibri' }),
+          new TextRun({ text: techText, size: 19, color: GRAY, font: 'Calibri' }),
+        ],
+        spacing: { before: 160, after: 60 },
+      }))
+      if (proj.description) {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: proj.description, size: 19, color: BLACK, font: 'Calibri' })],
+          spacing: { after: 60 },
+        }))
+      }
+      if (proj.url) {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: proj.url, size: 18, color: BLUE, font: 'Calibri' })],
+          spacing: { after: 80 },
+        }))
+      }
+    }
+  }
+
   const doc = new Document({
     sections: [{
-      properties: { page: { margin: { top: 720, bottom: 720, left: 900, right: 900 } } },
+      properties: { page: { margin: { top: 720, bottom: 720, left: 864, right: 864 } } },
       children,
     }],
     styles: {
       default: {
         document: {
-          run: { font: 'Calibri', size: 20 },
+          run: { font: 'Calibri', size: 20, color: BLACK },
           paragraph: { spacing: { line: 276 } },
         },
       },
