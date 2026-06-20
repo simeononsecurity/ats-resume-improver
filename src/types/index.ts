@@ -10,7 +10,15 @@ export interface ResumeData {
   education: EducationItem[]
   skills: string[]
   certifications: string[]
+  projects?: ProjectItem[]
   rawText: string
+}
+
+export interface ProjectItem {
+  name: string
+  description: string
+  technologies?: string[]
+  url?: string
 }
 
 export interface ExperienceItem {
@@ -77,6 +85,22 @@ export interface AtsScore {
   completeness: number
   formatting: number
   issues: AtsIssue[]
+}
+
+export interface OptimizationOptions {
+  rewriteSummary: boolean
+  includeSkillsSection: boolean
+  includeProjectsSection: boolean
+  improveBullets: boolean
+  integrateKeywords: boolean
+}
+
+export const DEFAULT_OPTIMIZATION_OPTIONS: OptimizationOptions = {
+  rewriteSummary: true,
+  includeSkillsSection: true,
+  includeProjectsSection: true,
+  improveBullets: true,
+  integrateKeywords: true,
 }
 
 export interface OptimizationChange {

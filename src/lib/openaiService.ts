@@ -1,4 +1,5 @@
-import type { ResumeData, JobDescriptionData, OptimizedResume, OptimizationChange, InterviewPrediction, SalaryEstimate } from '../types'
+import type { ResumeData, JobDescriptionData, OptimizedResume, OptimizationChange, InterviewPrediction, SalaryEstimate, OptimizationOptions } from '../types'
+import { DEFAULT_OPTIMIZATION_OPTIONS } from '../types'
 import { getSectionOrder, SECTION_TITLES } from './resumeTypeDetector'
 import { callAI } from './aiProvider'
 import type { AIConfig } from './aiProvider'
@@ -120,7 +121,31 @@ export function parseResumeLocal(rawText: string): ResumeData {
     }
   }
 
-  return { name, email, phone, location: '', summary, experience, education, skills, certifications, rawText }
+  const projects: NonNullable<ResumeData['projects']> = []
+  const projectsHeaderIdx = lines.findIndex((l) => /^projects?/i.test(l))
+  if (projectsHeaderIdx >= 0) {
+    let currentProj: { name: string; description: string; technologies: string[]; url?: string } | null = null
+    for (let i = projectsHeaderIdx + 1; i < lines.length; i++) {
+      const l = lines[i]
+      if (/^(education|professional experience|experience|skills|certifications?|summary|objective)/i.test(l)) break
+      if (!l.startsWith('-') && !l.startsWith('•') && l.length > 2) {
+        if (currentProj) projects.push(currentProj)
+        currentProj = { name: l, description: '', technologies: [] }
+      } else if (currentProj) {
+        const content = l.replace(/^[-•]\s*/, '')
+        if (/^(tech|stack|built with|technologies|tools):\s*/i.test(content)) {
+          currentProj.technologies = content.replace(/^[^:]+:\s*/i, '').split(/[,|]/).map((t) => t.trim()).filter(Boolean)
+        } else if (/^https?:\/\//i.test(content)) {
+          currentProj.url = content
+        } else {
+          currentProj.description = currentProj.description ? currentProj.description + ' ' + content : content
+        }
+      }
+    }
+    if (currentProj) projects.push(currentProj)
+  }
+
+  return { name, email, phone, location: '', summary, experience, education, skills, certifications, projects: projects.length > 0 ? projects : undefined, rawText }
 }
 
 // ─── Stage 1: Parse Resume with AI ───────────────────────────────────────────
@@ -146,7 +171,9 @@ Return this exact JSON structure:
   "name": "", "email": "", "phone": "", "location": "", "summary": "",
   "experience": [{ "title": "", "company": "", "startDate": "", "endDate": "", "bullets": [] }],
   "education": [{ "degree": "", "institution": "", "year": "", "gpa": "" }],
-  "skills": [], "certifications": [], "rawText": ""
+  "skills": [], "certifications": [],
+  "projects": [{ "name": "", "description": "", "technologies": [], "url": "" }],
+  "rawText": ""
 }`
 
   const raw = await callAI(config, system, user, 0.1)
@@ -208,6 +235,7 @@ export async function optimizeResumeWithAI(
   resumeData: ResumeData,
   jobData: JobDescriptionData | null,
   missingKeywords: string[],
+  options: OptimizationOptions = DEFAULT_OPTIMIZATION_OPTIONS,
 ): Promise<OptimizedResume> {
   const { detectResumeType, getSectionOrder } = await import('./resumeTypeDetector')
   const profile = detectResumeType(resumeData)
@@ -255,9 +283,18 @@ RESPONSIBILITIES: ${jobData.responsibilities.slice(0, 5).join(' | ')}
 MISSING KEYWORDS: ${missingKeywords.slice(0, 15).join(', ')}`
     : 'No specific job description — optimize for general ATS compatibility.'
 
+  const optionNotes = [
+    !options.rewriteSummary ? '• DO NOT rewrite the summary — preserve it exactly as written' : '',
+    !options.includeSkillsSection ? '• DO NOT include a skills section in the output' : '',
+    !options.includeProjectsSection ? '• DO NOT include a projects section in the output' : '',
+    !options.improveBullets ? '• DO NOT rephrase bullet points — preserve them as written' : '',
+    !options.integrateKeywords ? '• DO NOT integrate additional keywords from the job description' : '',
+  ].filter(Boolean).join('\n')
+
   const user = `Optimize this resume.
 
 ${jobContext}
+${optionNotes ? '\nUSER-SELECTED CONSTRAINTS (follow exactly):\n' + optionNotes : ''}
 
 === FULL ORIGINAL RESUME TEXT ===
 ${(resumeData.rawText || '').slice(0, 7000)}
@@ -266,15 +303,18 @@ ${(resumeData.rawText || '').slice(0, 7000)}
 Name: ${resumeData.name} | Email: ${resumeData.email} | Phone: ${resumeData.phone}
 Skills: ${resumeData.skills.join(', ')}
 ${resumeData.experience.length} experience entries | ${resumeData.education.length} education entries
+${(resumeData.projects?.length ?? 0) > 0 ? `${resumeData.projects!.length} project entries` : ''}
 
 RETURN this exact JSON (no markdown). Output structuredData FIRST — it is the most important field.
-structuredData MUST include EVERY experience entry with ALL bullets, EVERY education entry, ALL skills and certifications:
+structuredData MUST include EVERY experience entry with ALL bullets, EVERY education entry, ALL skills, certifications, and projects:
 {
   "structuredData": {
     "name":"","email":"","phone":"","location":"","summary":"",
     "experience":[{"title":"","company":"","startDate":"","endDate":"","bullets":[]}],
     "education":[{"degree":"","institution":"","year":"","gpa":""}],
-    "skills":[],"certifications":[],"rawText":""
+    "skills":[],"certifications":[],
+    "projects":[{"name":"","description":"","technologies":[],"url":""}],
+    "rawText":""
   },
   "changes": [{"section":"","original":"","updated":"","reason":""}]
 }`
@@ -283,7 +323,7 @@ structuredData MUST include EVERY experience entry with ALL bullets, EVERY educa
 
   function mergeWithFallback(aiSd: Partial<ResumeData>): ResumeData {
     // Never let an empty AI array override real data from the original parse
-    return {
+    const merged: ResumeData = {
       ...resumeData,
       name: aiSd.name || resumeData.name,
       location: aiSd.location || resumeData.location,
@@ -292,11 +332,17 @@ structuredData MUST include EVERY experience entry with ALL bullets, EVERY educa
       certifications: (aiSd.certifications?.length ?? 0) > 0 ? aiSd.certifications! : resumeData.certifications,
       experience: (aiSd.experience?.length ?? 0) > 0 ? aiSd.experience! : resumeData.experience,
       education: (aiSd.education?.length ?? 0) > 0 ? aiSd.education! : resumeData.education,
+      projects: (aiSd.projects?.length ?? 0) > 0 ? aiSd.projects : resumeData.projects,
       rawText: resumeData.rawText,
     }
+    // Apply user options: override AI results where user opted out
+    if (!options.rewriteSummary) merged.summary = resumeData.summary
+    if (!options.includeSkillsSection) merged.skills = []
+    if (!options.includeProjectsSection) merged.projects = undefined
+    return merged
   }
 
-  const kwAppendix = missingKeywords.length > 0
+  const kwAppendix = options.integrateKeywords && missingKeywords.length > 0
     ? `\n\nSUGGESTED KEYWORDS TO INTEGRATE\n${'─'.repeat(50)}\n` +
       `Review these keywords from the job description. If you have genuine experience with any,\n` +
       `naturally incorporate them into your existing bullet points using this format:\n` +
@@ -307,7 +353,7 @@ structuredData MUST include EVERY experience entry with ALL bullets, EVERY educa
   try {
     const parsed = JSON.parse(raw)
     const sd = mergeWithFallback(parsed.structuredData || {})
-    const atsVersion = buildAtsVersion([], sd)
+    const atsVersion = buildAtsVersion([], sd, options)
     return {
       atsVersion,
       tailoredVersion: atsVersion + kwAppendix,
@@ -320,7 +366,7 @@ structuredData MUST include EVERY experience entry with ALL bullets, EVERY educa
       try {
         const parsed = JSON.parse(match[0])
         const sd = mergeWithFallback(parsed.structuredData || {})
-        const atsVersion = buildAtsVersion([], sd)
+        const atsVersion = buildAtsVersion([], sd, options)
         return {
           atsVersion,
           tailoredVersion: atsVersion + kwAppendix,
@@ -335,31 +381,44 @@ structuredData MUST include EVERY experience entry with ALL bullets, EVERY educa
 
 // ─── Stage 4: Deterministic ATS Optimization (No API Key) ────────────────────
 
-export function optimizeResumeLocal(resumeData: ResumeData, missingKeywords: string[]): OptimizedResume {
+export function optimizeResumeLocal(
+  resumeData: ResumeData,
+  missingKeywords: string[],
+  options: OptimizationOptions = DEFAULT_OPTIMIZATION_OPTIONS,
+): OptimizedResume {
   const changes: OptimizationChange[] = []
   const rawLines = (resumeData.rawText || '').split('\n')
-  const improvedLines = rawLines.map((line) => {
-    const trimmed = line.trim()
-    if (!trimmed) return line
-    if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
-      const bulletContent = trimmed.replace(/^[-•]\s*/, '')
-      const improved = improveBullet(bulletContent, changes)
-      const indent = line.match(/^(\s*)/)?.[1] ?? ''
-      return `${indent}• ${improved}`
-    }
-    return line
-  })
+  const improvedLines = options.improveBullets
+    ? rawLines.map((line) => {
+        const trimmed = line.trim()
+        if (!trimmed) return line
+        if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
+          const bulletContent = trimmed.replace(/^[-•]\s*/, '')
+          const improved = improveBullet(bulletContent, changes)
+          const indent = line.match(/^(\s*)/)?.[1] ?? ''
+          return `${indent}• ${improved}`
+        }
+        return line
+      })
+    : rawLines
 
-  const atsVersion = buildAtsVersion(improvedLines, resumeData)
+  // Apply options to a copy of resumeData
+  const effectiveData: ResumeData = {
+    ...resumeData,
+    skills: options.includeSkillsSection ? resumeData.skills : [],
+    projects: options.includeProjectsSection ? resumeData.projects : undefined,
+  }
+
+  const atsVersion = buildAtsVersion(improvedLines, effectiveData, options)
   let tailoredVersion = atsVersion
-  if (missingKeywords.length > 0) {
+  if (options.integrateKeywords && missingKeywords.length > 0) {
     tailoredVersion += `\n\nSUGGESTED KEYWORDS TO INTEGRATE\n${'─'.repeat(50)}\n` +
       `Review these keywords from the job description. If you have genuine experience with any,\n` +
       `naturally incorporate them into your existing bullet points using this format:\n` +
       `"[Action Verb] [keyword/tool] to [what you did], resulting in [measurable outcome]"\n\n` +
       `Keywords: ${missingKeywords.slice(0, 20).join(', ')}`
   }
-  return { atsVersion, tailoredVersion, changes, structuredData: resumeData }
+  return { atsVersion, tailoredVersion, changes, structuredData: effectiveData }
 }
 
 /** Extract raw lines belonging to a section from rawText (between two header patterns). */
@@ -376,7 +435,7 @@ function extractRawSection(rawText: string, startPattern: RegExp, endPattern: Re
   return result.filter(l => l.trim())
 }
 
-function buildAtsVersion(_improvedLines: string[], resumeData: ResumeData): string {
+function buildAtsVersion(_improvedLines: string[], resumeData: ResumeData, options?: OptimizationOptions): string {
   const rawText = resumeData.rawText || ''
   const order = getSectionOrder(resumeData)
   const DIV = '─'.repeat(50)
@@ -397,7 +456,9 @@ function buildAtsVersion(_improvedLines: string[], resumeData: ResumeData): stri
           lines.push(SECTION_TITLES.experience, DIV)
           for (const exp of resumeData.experience) {
             lines.push('', `${exp.title} | ${exp.company}`, `${exp.startDate}${exp.endDate ? ' – ' + exp.endDate : ' – Present'}`)
-            for (const bullet of exp.bullets) lines.push(`• ${improveBullet(bullet, [])}`)
+            for (const bullet of exp.bullets) {
+              lines.push(`• ${options?.improveBullets !== false ? improveBullet(bullet, []) : bullet}`)
+            }
           }
           lines.push('')
         } else {
@@ -432,6 +493,24 @@ function buildAtsVersion(_improvedLines: string[], resumeData: ResumeData): stri
           lines.push('')
         }
         break
+    }
+  }
+
+  // Projects section — always appended at end if present
+  if (options?.includeProjectsSection !== false) {
+    if (resumeData.projects && resumeData.projects.length > 0) {
+      lines.push('PROJECTS', DIV)
+      for (const proj of resumeData.projects) {
+        lines.push(proj.name + (proj.technologies?.length ? ' | ' + proj.technologies.join(', ') : ''))
+        if (proj.description) lines.push(`  ${proj.description}`)
+        if (proj.url) lines.push(`  ${proj.url}`)
+      }
+      lines.push('')
+    } else {
+      const rawProj = extractRawSection(rawText,
+        /^projects?/i,
+        /^(professional experience|experience|education|skills|certifications?|summary|objective)/i)
+      if (rawProj.length > 0) { lines.push('PROJECTS', DIV, ...rawProj, '') }
     }
   }
 
@@ -511,7 +590,17 @@ COVER LETTER RULES:
 • Never use: "I believe I would be a great fit", "I am a quick learner", "I am passionate"
 • Professional salutation: "Dear [Name]:" or "Dear Hiring Manager:" — never "To Whom It May Concern"
 • Do NOT write [placeholder] brackets or generic fillers — write the actual letter
-• HONESTY: Every achievement, skill, and technology mentioned must come from the candidate's actual resume — never invent experience to fill a gap in the job requirements`
+• HONESTY: Every achievement, skill, and technology mentioned must come from the candidate's actual resume — never invent experience to fill a gap in the job requirements
+
+HUMAN VOICE RULES (these are critical — the letter must NOT sound AI-generated):
+• Use contractions naturally: "I've", "I'm", "it's", "that's", "here's", "you'll" — not "I have", "I am", "it is"
+• Vary sentence length: short punchy sentences mixed with longer ones — avoid robotic uniform rhythm
+• Do NOT open every sentence with "I" — rearrange naturally: "Over the past five years, I've..." or "What drew me to this role..."
+• Avoid these AI-giveaway buzzwords entirely: "leverage", "passionate", "synergy", "innovative", "dynamic", "results-driven", "seek to", "I am excited to", "I would love to"
+• Use a specific, concrete detail from the job posting in paragraph 1 — shows you actually read it, not just ran a template
+• Write like a real person talking to another real person — not a press release
+• One informal transition is fine: "Honestly," or "Put simply," — if it fits naturally
+• The closing paragraph should feel warm and direct, not stiff: "I'd welcome the chance to talk through how I could help" beats "I look forward to the opportunity to discuss my qualifications"`
 
   const user = `Write a tailored cover letter for this specific application.
 

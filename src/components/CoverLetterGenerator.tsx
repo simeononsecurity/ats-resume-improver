@@ -74,6 +74,42 @@ export function CoverLetterGenerator({
     URL.revokeObjectURL(url)
   }
 
+  const handleDownloadDOCX = async () => {
+    try {
+      const { Document, Paragraph, TextRun, Packer } = await import('docx')
+      const paragraphs = coverLetter.split('\n').map(
+        (line) =>
+          new Paragraph({
+            children: [new TextRun({ text: line, size: 22, font: 'Calibri' })],
+            spacing: { after: line.trim() === '' ? 80 : 160 },
+          }),
+      )
+      const doc = new Document({
+        sections: [{
+          properties: { page: { margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 } } },
+          children: paragraphs,
+        }],
+        styles: {
+          default: {
+            document: { run: { font: 'Calibri', size: 22 }, paragraph: { spacing: { line: 276 } } },
+          },
+        },
+      })
+      const blob = await Packer.toBlob(doc)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'cover-letter.docx'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      // Fallback to txt if docx fails
+      handleDownload()
+    }
+  }
+
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Requirements check */}
@@ -179,6 +215,10 @@ export function CoverLetterGenerator({
               <Button variant="secondary" size="sm" onClick={handleDownload}>
                 <Download className="w-4 h-4" />
                 .txt
+              </Button>
+              <Button variant="secondary" size="sm" onClick={handleDownloadDOCX}>
+                <Download className="w-4 h-4" />
+                .docx
               </Button>
             </div>
           </CardHeader>
