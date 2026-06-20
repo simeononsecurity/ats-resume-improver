@@ -593,14 +593,38 @@ COVER LETTER RULES:
 • HONESTY: Every achievement, skill, and technology mentioned must come from the candidate's actual resume — never invent experience to fill a gap in the job requirements
 
 HUMAN VOICE RULES (these are critical — the letter must NOT sound AI-generated):
+
+TONE AND STYLE:
 • Use contractions naturally: "I've", "I'm", "it's", "that's", "here's", "you'll" — not "I have", "I am", "it is"
-• Vary sentence length: short punchy sentences mixed with longer ones — avoid robotic uniform rhythm
-• Do NOT open every sentence with "I" — rearrange naturally: "Over the past five years, I've..." or "What drew me to this role..."
-• Avoid these AI-giveaway buzzwords entirely: "leverage", "passionate", "synergy", "innovative", "dynamic", "results-driven", "seek to", "I am excited to", "I would love to"
-• Use a specific, concrete detail from the job posting in paragraph 1 — shows you actually read it, not just ran a template
+• Vary sentence length: short punchy sentences mixed with longer ones — monotone rhythm is a machine tell
+• Do NOT open consecutive sentences with "I" — rearrange: "Over the past five years, I've..." or "What drew me to this role..."
+• Active voice by default; passive only when the actor genuinely doesn't matter
 • Write like a real person talking to another real person — not a press release
-• One informal transition is fine: "Honestly," or "Put simply," — if it fits naturally
-• The closing paragraph should feel warm and direct, not stiff: "I'd welcome the chance to talk through how I could help" beats "I look forward to the opportunity to discuss my qualifications"`
+• One informal transition is fine ("Honestly," or "Put simply,") if it fits naturally
+• The closing should be warm and direct: "I'd welcome a chance to talk through how I could help" beats "I look forward to the opportunity to discuss my qualifications"
+• Use a specific, concrete detail from the job posting in paragraph 1 — it proves you actually read it
+
+PUNCTUATION AND FORMATTING:
+• NEVER use em dashes (—) anywhere — use a comma, period, or rewrite the sentence instead
+• No markdown — no bold (**), no italics (*), no bullet symbols in the letter body
+• No hashtags, no asterisks, no semicolons
+
+WORDS TO AVOID ENTIRELY (these are AI giveaways — do not use them):
+leverage, passionate, synergy, innovative, dynamic, results-driven, utilize, utilizing,
+dive deep, delve, embark, craft, crafting, imagine, realm, game-changer, unlock, discover,
+skyrocket, groundbreaking, cutting-edge, remarkable, revolutionary, disruptive, pivotal,
+intricate, illuminate, unveil, elucidate, tapestry, abyss, harness, exciting, powerful,
+moreover, furthermore, hence, however (at sentence start), in conclusion, in summary,
+in closing, it's worth noting, it's important to note, needless to say, as we know,
+ever-evolving, navigating, landscape, stark, testament, opened up, glimpse into,
+seek to, I am excited to, I would love to, I believe I would be a great fit,
+I am a quick learner, not only...but also, not just...but also
+
+STRUCTURE:
+• Cut filler openers: "It's important to note that X" → just say X
+• No clichés, no generalizations, no forced keyword placement
+• One idea, said once, well — eliminate redundancy
+• Hedge only when genuinely uncertain; false confidence is its own AI tell`
 
   const user = `Write a tailored cover letter for this specific application.
 
