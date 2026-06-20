@@ -328,6 +328,17 @@ Key rules applied to every generated cover letter:
 - **One informal transition** allowed if it fits naturally
 - **Concrete job-posting detail** in paragraph 1 — proves the letter wasn't templated
 
+## 📋 Resume Tips & Tricks
+
+Not sure if your resume is in good shape before running it through the tool? Read **[RESUME_TIPS.md](./RESUME_TIPS.md)** — a no-fluff guide covering:
+
+- How ATS systems actually score resumes
+- Formatting rules that matter (and what breaks parsers)
+- Writing summaries, bullets, and skills sections that work
+- Keyword strategy without stuffing
+- Cover letter tone and structure
+- Pre-submission checklist
+
 ## 🤝 Contributing
 
 Pull requests are welcome. For major changes, open an issue first. See the [GitHub repo](https://github.com/simeononsecurity/ats-resume-improver) for the latest.
