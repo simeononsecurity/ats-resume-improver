@@ -130,6 +130,7 @@ export interface AppState {
   coverLetter: string
   interviewPrediction: InterviewPrediction | null
   salaryEstimate: SalaryEstimate | null
+  linkedInOptimization: LinkedInOptimization | null
   isLoading: boolean
   loadingMessage: string
   error: string | null
@@ -176,6 +177,23 @@ export interface SalaryEstimate {
   disclaimer: string
 }
 
+// ─── LinkedIn Optimization ────────────────────────────────────────────────────
+
+export interface LinkedInJobEntry {
+  title: string
+  company: string
+  startDate: string
+  endDate: string
+  isCurrent: boolean
+  optimizedDescription: string  // third-person, active voice; present tense if current
+}
+
+export interface LinkedInOptimization {
+  headline: string       // ≤220 chars — keyword-rich professional headline
+  about: string          // ~2,000 chars — first-person About section
+  jobs: LinkedInJobEntry[]
+}
+
 // ─── App Steps ────────────────────────────────────────────────────────────────
 
 export type AppStep =
@@ -188,5 +206,6 @@ export type AppStep =
   | 'optimize'
   | 'diff'
   | 'export'
+  | 'linkedin'
 
 export type ExportFormat = 'pdf' | 'docx' | 'txt' | 'md'

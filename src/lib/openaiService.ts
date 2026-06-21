@@ -1,4 +1,4 @@
-import type { ResumeData, JobDescriptionData, OptimizedResume, OptimizationChange, InterviewPrediction, SalaryEstimate, OptimizationOptions } from '../types'
+import type { ResumeData, JobDescriptionData, OptimizedResume, OptimizationChange, InterviewPrediction, SalaryEstimate, OptimizationOptions, LinkedInOptimization } from '../types'
 import { DEFAULT_OPTIMIZATION_OPTIONS } from '../types'
 import { getSectionOrder, SECTION_TITLES } from './resumeTypeDetector'
 import { callAI } from './aiProvider'
@@ -768,5 +768,140 @@ Return ONLY this JSON structure (all salary figures as whole-number integers, US
       try { return JSON.parse(match[0]) as SalaryEstimate } catch { /* fall through */ }
     }
     throw new Error('Failed to parse salary estimation response.')
+  }
+}
+
+// ─── Stage 8: LinkedIn Profile Optimizer ─────────────────────────────────────
+
+export async function generateLinkedInOptimization(
+  config: AIConfig,
+  resumeData: ResumeData,
+): Promise<LinkedInOptimization> {
+  const system = `You are a LinkedIn profile optimization expert who has helped thousands of professionals
+improve their profiles to attract recruiters and opportunities.
+
+HONESTY RULES (absolute — override everything):
+• NEVER invent experience, titles, companies, skills, or credentials not in the resume
+• NEVER exaggerate tenure, scope, or impact beyond what the resume states
+• NEVER add certifications or degrees the candidate did not list
+• Your job is to REFRAME and REWRITE what is already present — stronger language, clearer positioning
+• Inflating or fabricating anything on a LinkedIn profile causes direct real-world harm
+
+LINKEDIN-SPECIFIC RULES:
+• Headline: ≤220 characters — combine title, specialization, and 2-3 top skills; no buzzwords; no "seeking"
+• About section: 1,800–2,000 characters; first person ("I"); conversational but professional
+  - Opening hook: one sentence that states who you are and what you do — no "I am a passionate..."
+  - 2-3 paragraphs covering: what you do, what you're good at, what you've done that matters
+  - Close with what you're looking for or open to (optional but recommended)
+  - Contractions are fine: "I've", "I'm", "it's"
+  - No bullet points, no headers, no markdown in the About section
+  - Must not sound AI-generated — vary sentence length, use concrete specifics, no buzzwords
+• Job descriptions: THIRD PERSON, ACTIVE VOICE
+  - Current role → present tense: "Leads a team of...", "Manages...", "Builds..."
+  - Past roles → past tense: "Led...", "Managed...", "Built..."
+  - 3-5 short punchy sentences per role — not resume bullets, not paragraph prose
+  - Include what the person does/did, what they're known for in that role, one achievement if possible
+  - No "Responsible for" — own every verb
+  - Keep it factual: if the resume doesn't say it, don't say it
+
+WRITING VOICE RULES (apply to all output):
+• NO em dashes (—) — use a comma, period, or rewrite
+• NO buzzwords: leverage, utilize, passionate, innovative, dynamic, synergy, results-driven,
+  dive deep, delve, embark, game-changer, groundbreaking, cutting-edge, pivotal, tapestry,
+  harness, moreover, furthermore, in conclusion, it's worth noting, ever-evolving, landscape,
+  testament, not only...but also
+• Vary sentence length — short and punchy mixed with longer
+• Active voice throughout
+• Sound like a smart professional wrote it, not a content generator
+
+Return ONLY valid JSON — no markdown fences, no explanation.`
+
+  // Determine current job: assume most-recent with endDate = "Present", "Current", empty, or current year
+  const currentYear = new Date().getFullYear().toString()
+  const jobsWithCurrent = resumeData.experience.map(exp => {
+    const end = (exp.endDate || '').toLowerCase().trim()
+    const isCurrent =
+      end === '' ||
+      end === 'present' ||
+      end === 'current' ||
+      end === 'now' ||
+      end.includes(currentYear)
+    return { ...exp, isCurrent }
+  })
+
+  const expSummary = jobsWithCurrent.map((exp, i) =>
+    `[${i}] ${exp.title} at ${exp.company} (${exp.startDate} – ${exp.endDate || 'Present'}) | CURRENT: ${exp.isCurrent}\nBullets: ${exp.bullets.slice(0, 3).join(' / ')}`
+  ).join('\n\n')
+
+  const user = `Optimize the LinkedIn profile for this person.
+
+=== CANDIDATE DATA ===
+Name: ${resumeData.name}
+Current Title / Most Recent Role: ${resumeData.experience[0]?.title ?? 'N/A'} at ${resumeData.experience[0]?.company ?? 'N/A'}
+Summary from resume: ${resumeData.summary}
+Skills: ${resumeData.skills.join(', ')}
+Certifications: ${resumeData.certifications.join(', ')}
+Location: ${resumeData.location}
+
+=== WORK HISTORY (${jobsWithCurrent.length} roles) ===
+${expSummary}
+
+=== FULL RESUME TEXT ===
+${(resumeData.rawText || '').slice(0, 4000)}
+
+Generate optimized LinkedIn content. For each job, use the isCurrent flag to determine tense:
+- isCurrent: true → present tense, third person ("Leads...", "Manages...")
+- isCurrent: false → past tense, third person ("Led...", "Managed...")
+
+Return ONLY this JSON (no markdown, no fences):
+{
+  "headline": "≤220 char headline — title | specialization | top keywords",
+  "about": "full About section text, ~1800-2000 chars, first person, no markdown",
+  "jobs": [
+    {
+      "title": "exact title from resume",
+      "company": "exact company name from resume",
+      "startDate": "exact date from resume",
+      "endDate": "exact date from resume or Present",
+      "isCurrent": true | false,
+      "optimizedDescription": "3-5 sentence third-person description, correct tense based on isCurrent"
+    }
+  ]
+}`
+
+  const raw = await callAI(config, system, user, 0.5)
+  try {
+    const cleaned = raw.replace(/^```(?:json)?\n?|```\s*$/gm, '').trim()
+    const parsed = JSON.parse(cleaned) as LinkedInOptimization
+    // Safety: ensure jobs array matches resume length, fallback to empty description if missing
+    const jobs = jobsWithCurrent.map((exp, i) => {
+      const aiJob = parsed.jobs?.[i]
+      return {
+        title: exp.title,
+        company: exp.company,
+        startDate: exp.startDate,
+        endDate: exp.endDate || 'Present',
+        isCurrent: exp.isCurrent,
+        optimizedDescription: aiJob?.optimizedDescription ?? '',
+      }
+    })
+    return { headline: parsed.headline ?? '', about: parsed.about ?? '', jobs }
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[0]) as LinkedInOptimization
+        const jobs = jobsWithCurrent.map((exp, i) => ({
+          title: exp.title,
+          company: exp.company,
+          startDate: exp.startDate,
+          endDate: exp.endDate || 'Present',
+          isCurrent: exp.isCurrent,
+          optimizedDescription: parsed.jobs?.[i]?.optimizedDescription ?? '',
+        }))
+        return { headline: parsed.headline ?? '', about: parsed.about ?? '', jobs }
+      } catch { /* fall through */ }
+    }
+    throw new Error('Failed to parse LinkedIn optimization response.')
   }
 }

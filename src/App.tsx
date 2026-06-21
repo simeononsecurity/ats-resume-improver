@@ -3,7 +3,7 @@ import {
   Upload, Eye, Briefcase, Hash, Target, Wand2,
   GitCompare, Download, Mail, KeyRound, RotateCcw,
   ChevronRight, Check, Sparkles, ShieldCheck,
-  MessageSquare, DollarSign,
+  MessageSquare, DollarSign, Link2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -19,9 +19,11 @@ import { ExportOptions } from '@/components/ExportOptions'
 import { CoverLetterGenerator } from '@/components/CoverLetterGenerator'
 import { InterviewPredictor } from '@/components/InterviewPredictor'
 import { SalaryEstimator } from '@/components/SalaryEstimator'
+import { LinkedInOptimizer } from '@/components/LinkedInOptimizer'
 import type {
   AppState, AppStep, ResumeData, JobDescriptionData, OptimizedResume,
   KeywordAnalysis as KeywordAnalysisType, InterviewPrediction, SalaryEstimate,
+  LinkedInOptimization,
 } from '@/types'
 import { scoreResume } from '@/lib/atsAnalyzer'
 import { analyzeKeywords } from '@/lib/keywordMatcher'
@@ -44,6 +46,7 @@ const initialState: AppState = {
   coverLetter: '',
   interviewPrediction: null,
   salaryEstimate: null,
+  linkedInOptimization: null,
   isLoading: false,
   loadingMessage: '',
   error: null,
@@ -59,6 +62,7 @@ type Action =
   | { type: 'SET_COVER_LETTER'; payload: string }
   | { type: 'SET_INTERVIEW_PREDICTION'; payload: InterviewPrediction }
   | { type: 'SET_SALARY_ESTIMATE'; payload: SalaryEstimate }
+  | { type: 'SET_LINKEDIN_OPTIMIZATION'; payload: LinkedInOptimization }
   | { type: 'SET_STEP'; payload: AppStep }
   | { type: 'SET_LOADING'; payload: { loading: boolean; message?: string } }
   | { type: 'SET_ERROR'; payload: string | null }
@@ -119,6 +123,9 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_SALARY_ESTIMATE':
       return { ...state, salaryEstimate: action.payload }
 
+    case 'SET_LINKEDIN_OPTIMIZATION':
+      return { ...state, linkedInOptimization: action.payload }
+
     case 'SET_STEP':
       return { ...state, step: action.payload }
 
@@ -146,6 +153,7 @@ const STEPS: { id: AppStep; label: string; icon: React.ReactNode; requiresResume
   { id: 'optimize',        label: 'Optimize',  icon: <Wand2 className="w-4 h-4" />,         requiresResume: true },
   { id: 'diff',            label: 'Diff',      icon: <GitCompare className="w-4 h-4" />,    requiresResume: true },
   { id: 'export',          label: 'Export',    icon: <Download className="w-4 h-4" />,      requiresResume: true },
+  { id: 'linkedin',        label: 'LinkedIn',  icon: <Link2 className="w-4 h-4" />,          requiresResume: true },
 ]
 
 export default function App() {
@@ -428,6 +436,22 @@ export default function App() {
               </StepWrapper>
             )}
 
+            {/* LinkedIn */}
+            {state.step === 'linkedin' && hasResume && state.resumeData && (
+              <StepWrapper
+                title="LinkedIn Profile Optimizer"
+                subtitle="AI-optimized headline, About section, and per-role descriptions based on your resume."
+                icon={<Link2 className="w-5 h-5 text-blue-400" />}
+              >
+                <LinkedInOptimizer
+                  aiConfig={state.aiConfig}
+                  resumeData={state.resumeData}
+                  optimization={state.linkedInOptimization}
+                  onGenerated={result => dispatch({ type: 'SET_LINKEDIN_OPTIMIZATION', payload: result })}
+                />
+              </StepWrapper>
+            )}
+
             {/* Export */}
             {state.step === 'export' && state.optimizedResume && state.resumeData && (
               <StepWrapper title="Export" subtitle="Download your optimized resume in your preferred format." icon={<Download className="w-5 h-5 text-indigo-400" />}>
@@ -455,7 +479,7 @@ export default function App() {
                 <Button onClick={() => setStep('upload')}>Upload Resume</Button>
               </div>
             )}
-            {(state.step === 'interview' || state.step === 'salary') && hasResume && !state.resumeData && (
+            {(state.step === 'interview' || state.step === 'salary' || state.step === 'linkedin') && hasResume && !state.resumeData && (
               <div className="text-center py-16">
                 <Sparkles className="w-12 h-12 mx-auto mb-4 text-slate-700" />
                 <p className="text-slate-500 mb-4">Resume data is still loading...</p>
