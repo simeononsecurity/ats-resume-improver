@@ -136,7 +136,7 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, error: action.payload, isLoading: false }
 
     case 'RESET':
-      return { ...initialState }
+      return { ...initialState, aiConfig: state.aiConfig }
 
     default:
       return state
@@ -156,9 +156,24 @@ const STEPS: { id: AppStep; label: string; icon: React.ReactNode; requiresResume
   { id: 'linkedin',        label: 'LinkedIn',  icon: <Link2 className="w-4 h-4" />,          requiresResume: true },
 ]
 
+const PENDING_LABEL: Record<string, string> = {
+  interview: 'Interview Prep',
+  salary: 'Salary Estimate',
+  optimize: 'Resume Optimization',
+  linkedin: 'LinkedIn',
+  'cover-letter': 'Cover Letter',
+}
+
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
   const [aiKeywordLoading, setAiKeywordLoading] = useState(false)
+  const [pendingFeatures, setPendingFeatures] = useState<string[]>([])
+
+  const markPending = useCallback((feature: string, pending: boolean) => {
+    setPendingFeatures(prev =>
+      pending ? [...prev.filter(f => f !== feature), feature] : prev.filter(f => f !== feature)
+    )
+  }, [])
 
   const setStep = useCallback((step: AppStep) => {
     dispatch({ type: 'SET_STEP', payload: step })
@@ -238,6 +253,21 @@ export default function App() {
         </div>
       </header>
 
+      {/* Background generation status banner */}
+      {pendingFeatures.length > 0 && (
+        <div className="sticky top-14 z-40 bg-indigo-700/90 backdrop-blur-sm border-b border-indigo-500/40 px-4 py-1.5">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-2.5 text-xs text-white">
+            <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin flex-shrink-0" />
+            <span>
+              Generating{' '}
+              <span className="font-semibold">{pendingFeatures.map(f => PENDING_LABEL[f] ?? f).join(', ')}</span>
+              {' — '}
+              <span className="text-indigo-200">navigate freely, results save automatically when done</span>
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
         <div className="flex gap-6 lg:gap-8">
           {/* Sidebar */}
@@ -259,9 +289,14 @@ export default function App() {
                   }`}
                 >
                   <div className={`flex-shrink-0 ${isActive ? 'text-indigo-400' : isCompleted ? 'text-emerald-500' : 'text-slate-600'}`}>
-                    {isCompleted ? <Check className="w-4 h-4" /> : step.icon}
+                    {pendingFeatures.includes(step.id)
+                      ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      : isCompleted ? <Check className="w-4 h-4" /> : step.icon}
                   </div>
                   {step.label}
+                  {pendingFeatures.includes(step.id) && !isActive && (
+                    <span className="ml-auto text-[10px] text-indigo-400 font-semibold animate-pulse">●</span>
+                  )}
                   {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto text-indigo-400" />}
                 </button>
               )
@@ -292,7 +327,9 @@ export default function App() {
                       : 'text-slate-400 bg-[#1a1d27] hover:text-slate-200'
                     }`}
                   >
-                    {isCompleted ? <Check className="w-3 h-3 text-emerald-400" /> : step.icon}
+                    {pendingFeatures.includes(step.id)
+                      ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      : isCompleted ? <Check className="w-3 h-3 text-emerald-400" /> : step.icon}
                     {step.label}
                   </button>
                 )
@@ -388,6 +425,7 @@ export default function App() {
                   jobData={state.jobData}
                   prediction={state.interviewPrediction}
                   onGenerated={result => dispatch({ type: 'SET_INTERVIEW_PREDICTION', payload: result })}
+                  onPendingChange={p => markPending('interview', p)}
                 />
               </StepWrapper>
             )}
@@ -407,6 +445,7 @@ export default function App() {
                   jobData={state.jobData}
                   estimate={state.salaryEstimate}
                   onGenerated={result => dispatch({ type: 'SET_SALARY_ESTIMATE', payload: result })}
+                  onPendingChange={p => markPending('salary', p)}
                 />
               </StepWrapper>
             )}
@@ -420,7 +459,7 @@ export default function App() {
                 nextStep={state.optimizedResume ? () => setStep('diff') : undefined}
                 nextLabel="View Changes →"
               >
-                <ResumeOptimizer aiConfig={state.aiConfig} resumeData={state.resumeData} jobData={state.jobData} keywordAnalysis={state.keywordAnalysis} optimizedResume={state.optimizedResume} onOptimized={result => dispatch({ type: 'SET_OPTIMIZED', payload: result })} />
+                <ResumeOptimizer aiConfig={state.aiConfig} resumeData={state.resumeData} jobData={state.jobData} keywordAnalysis={state.keywordAnalysis} optimizedResume={state.optimizedResume} onOptimized={result => dispatch({ type: 'SET_OPTIMIZED', payload: result })} onPendingChange={p => markPending('optimize', p)} />
               </StepWrapper>
             )}
 
@@ -448,6 +487,7 @@ export default function App() {
                   resumeData={state.resumeData}
                   optimization={state.linkedInOptimization}
                   onGenerated={result => dispatch({ type: 'SET_LINKEDIN_OPTIMIZATION', payload: result })}
+                  onPendingChange={p => markPending('linkedin', p)}
                 />
               </StepWrapper>
             )}
@@ -465,7 +505,7 @@ export default function App() {
                     <h3 className="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider flex items-center gap-2">
                       <Mail className="w-4 h-4" />Cover Letter
                     </h3>
-                    <CoverLetterGenerator aiConfig={state.aiConfig} resumeData={state.resumeData} jobData={state.jobData} coverLetter={state.coverLetter} onGenerated={letter => dispatch({ type: 'SET_COVER_LETTER', payload: letter })} />
+                    <CoverLetterGenerator aiConfig={state.aiConfig} resumeData={state.resumeData} jobData={state.jobData} coverLetter={state.coverLetter} onGenerated={letter => dispatch({ type: 'SET_COVER_LETTER', payload: letter })} onPendingChange={p => markPending('cover-letter', p)} />
                   </div>
                 </div>
               </StepWrapper>

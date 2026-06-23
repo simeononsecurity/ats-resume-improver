@@ -12,6 +12,7 @@ interface CoverLetterGeneratorProps {
   jobData: JobDescriptionData | null
   coverLetter: string
   onGenerated: (letter: string) => void
+  onPendingChange?: (pending: boolean) => void
 }
 
 export function CoverLetterGenerator({
@@ -20,6 +21,7 @@ export function CoverLetterGenerator({
   jobData,
   coverLetter,
   onGenerated,
+  onPendingChange,
 }: CoverLetterGeneratorProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -45,6 +47,7 @@ export function CoverLetterGenerator({
     }
     setError('')
     setIsLoading(true)
+    onPendingChange?.(true)
     try {
       const { generateCoverLetterWithAI } = await import('@/lib/openaiService')
       const result = await generateCoverLetterWithAI(aiConfig, resumeData, jobData)
@@ -53,6 +56,7 @@ export function CoverLetterGenerator({
       setError(err instanceof Error ? err.message : 'Cover letter generation failed.')
     } finally {
       setIsLoading(false)
+      onPendingChange?.(false)
     }
   }
 

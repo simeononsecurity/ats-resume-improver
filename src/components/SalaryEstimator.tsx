@@ -10,6 +10,7 @@ interface Props {
   jobData: JobDescriptionData | null
   estimate: SalaryEstimate | null
   onGenerated: (result: SalaryEstimate) => void
+  onPendingChange?: (pending: boolean) => void
 }
 
 function fmt(n: number) {
@@ -40,7 +41,7 @@ function RangeBar({ low, median, high }: { low: number; median: number; high: nu
   )
 }
 
-export function SalaryEstimator({ aiConfig, resumeData, jobData, estimate, onGenerated }: Props) {
+export function SalaryEstimator({ aiConfig, resumeData, jobData, estimate, onGenerated, onPendingChange }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -49,6 +50,7 @@ export function SalaryEstimator({ aiConfig, resumeData, jobData, estimate, onGen
   const generate = async () => {
     if (!hasAI) return
     setLoading(true)
+    onPendingChange?.(true)
     setError(null)
     try {
       const { estimateSalaryWithAI } = await import('@/lib/openaiService')
@@ -58,6 +60,7 @@ export function SalaryEstimator({ aiConfig, resumeData, jobData, estimate, onGen
       setError(err instanceof Error ? err.message : 'Failed to estimate salary')
     } finally {
       setLoading(false)
+      onPendingChange?.(false)
     }
   }
 

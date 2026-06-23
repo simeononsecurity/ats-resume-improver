@@ -13,6 +13,7 @@ interface Props {
   jobData: JobDescriptionData | null
   prediction: InterviewPrediction | null
   onGenerated: (result: InterviewPrediction) => void
+  onPendingChange?: (pending: boolean) => void
 }
 
 const CATEGORY_COLORS: Record<InterviewQuestion['category'], string> = {
@@ -88,7 +89,7 @@ function QuestionCard({ q }: { q: InterviewQuestion }) {
   )
 }
 
-export function InterviewPredictor({ aiConfig, resumeData, jobData, prediction, onGenerated }: Props) {
+export function InterviewPredictor({ aiConfig, resumeData, jobData, prediction, onGenerated, onPendingChange }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<InterviewQuestion['category'] | 'all'>('all')
@@ -98,6 +99,7 @@ export function InterviewPredictor({ aiConfig, resumeData, jobData, prediction, 
   const generate = async () => {
     if (!hasAI) return
     setLoading(true)
+    onPendingChange?.(true)
     setError(null)
     try {
       const { predictInterviewQuestionsWithAI } = await import('@/lib/openaiService')
@@ -107,6 +109,7 @@ export function InterviewPredictor({ aiConfig, resumeData, jobData, prediction, 
       setError(err instanceof Error ? err.message : 'Failed to generate interview questions')
     } finally {
       setLoading(false)
+      onPendingChange?.(false)
     }
   }
 

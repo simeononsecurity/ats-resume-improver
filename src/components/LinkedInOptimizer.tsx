@@ -10,6 +10,7 @@ interface LinkedInOptimizerProps {
   resumeData: ResumeData
   optimization: LinkedInOptimization | null
   onGenerated: (result: LinkedInOptimization) => void
+  onPendingChange?: (pending: boolean) => void
 }
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -104,6 +105,7 @@ export function LinkedInOptimizer({
   resumeData,
   optimization,
   onGenerated,
+  onPendingChange,
 }: LinkedInOptimizerProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -124,6 +126,7 @@ export function LinkedInOptimizer({
     }
     setError('')
     setIsLoading(true)
+    onPendingChange?.(true)
     try {
       const { generateLinkedInOptimization } = await import('@/lib/openaiService')
       const result = await generateLinkedInOptimization(aiConfig, resumeData)
@@ -132,6 +135,7 @@ export function LinkedInOptimizer({
       setError(err instanceof Error ? err.message : 'LinkedIn optimization failed.')
     } finally {
       setIsLoading(false)
+      onPendingChange?.(false)
     }
   }
 

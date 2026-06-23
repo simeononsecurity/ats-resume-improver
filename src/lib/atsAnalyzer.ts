@@ -221,10 +221,63 @@ export function scoreResume(
       ? Math.round((skillsMatched.length / jobData.requiredSkills.length) * 100)
       : 50
   } else {
-    // No job description provided - give neutral score
-    keywordMatchScore = 50
-    skillsMatchScore = 50
-    issues.push({ type: 'info', category: 'Keywords', message: 'Add a job description to get keyword match analysis.' })
+    // No job description — compute content quality & depth scores from the resume itself
+    // so two different resumes produce meaningfully different overall scores.
+
+    // ── Content Quality: quantified achievements + action verb density + length ──
+    let contentQuality = 50
+
+    const resumeLines = resumeText.split('\n').filter(l => l.trim().length > 15)
+    const quantifiedCount = resumeLines.filter(l =>
+      /\b\d+\s*%|\$[\d,]+|\b\d{2,}\s*(users?|customers?|clients?|people|team|members?|engineers?)|improved.*\d|increased.*\d|reduced.*\d|saved.*\d|generated.*\$|grew.*\d/i.test(l)
+    ).length
+    const quantRatio = resumeLines.length > 0 ? quantifiedCount / Math.min(resumeLines.length, 40) : 0
+    contentQuality += Math.round(quantRatio * 30)  // up to +30
+
+    const ACTION_VERBS = [
+      'managed', 'led', 'built', 'developed', 'designed', 'implemented',
+      'increased', 'improved', 'created', 'launched', 'delivered', 'achieved',
+      'spearheaded', 'drove', 'reduced', 'optimized', 'architected', 'established',
+      'coordinated', 'streamlined', 'automated', 'deployed', 'scaled', 'mentored',
+      'trained', 'negotiated', 'partnered', 'analyzed', 'refactored', 'migrated',
+    ]
+    const verbCount = ACTION_VERBS.filter(v =>
+      new RegExp(`\\b${v}(d|ed|s)?\\b`, 'i').test(resumeText)
+    ).length
+    if (verbCount >= 10) contentQuality += 15
+    else if (verbCount >= 6) contentQuality += 10
+    else if (verbCount >= 3) contentQuality += 5
+    else if (verbCount === 0) contentQuality -= 15
+
+    const wordCount = resumeText.split(/\s+/).filter(Boolean).length
+    if (wordCount < 150) contentQuality -= 25
+    else if (wordCount < 300) contentQuality -= 12
+    else if (wordCount > 1800) contentQuality -= 8
+
+    keywordMatchScore = Math.max(0, Math.min(100, contentQuality))
+
+    // ── Resume Depth: contact links, extra sections, skills breadth ──
+    let depthScore = 45
+    if (/linkedin\.com\/in\//i.test(resumeText)) depthScore += 12
+    if (/github\.com\//i.test(resumeText)) depthScore += 8
+    if (sections.certifications) depthScore += 10
+    if (/\bprojects?\b/i.test(resumeText)) depthScore += 8
+    if (/\b(volunteer|leadership|awards?|honors?|publications?|patents?)\b/i.test(resumeText)) depthScore += 6
+    if (/\b[A-Z][a-z]+(,\s*[A-Z]{2})\b/.test(resumeText)) depthScore += 4  // city, state
+    if (resumeData) {
+      if (resumeData.skills.length >= 15) depthScore += 11
+      else if (resumeData.skills.length >= 8) depthScore += 6
+      else if (resumeData.skills.length >= 4) depthScore += 2
+      if (resumeData.experience.length >= 4) depthScore += 5
+      else if (resumeData.experience.length >= 2) depthScore += 2
+    }
+    skillsMatchScore = Math.max(0, Math.min(100, depthScore))
+
+    issues.push({
+      type: 'info',
+      category: 'Keywords',
+      message: 'Add a job description to get keyword match scores. Current scores reflect resume content quality and depth.',
+    })
   }
 
   completenessScore = Math.max(0, Math.min(100, completenessScore))

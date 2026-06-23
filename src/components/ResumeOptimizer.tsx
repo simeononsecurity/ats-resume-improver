@@ -14,6 +14,7 @@ interface ResumeOptimizerProps {
   keywordAnalysis: KeywordAnalysis | null
   optimizedResume: OptimizedResume | null
   onOptimized: (result: OptimizedResume) => void
+  onPendingChange?: (pending: boolean) => void
 }
 
 export function ResumeOptimizer({
@@ -23,6 +24,7 @@ export function ResumeOptimizer({
   keywordAnalysis,
   optimizedResume,
   onOptimized,
+  onPendingChange,
 }: ResumeOptimizerProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -46,6 +48,7 @@ export function ResumeOptimizer({
   const handleOptimize = async () => {
     setError('')
     setIsLoading(true)
+    onPendingChange?.(true)
     try {
       const missingKeywords = keywordAnalysis?.missing ?? []
       if (hasAI) {
@@ -61,6 +64,7 @@ export function ResumeOptimizer({
       setError(err instanceof Error ? err.message : 'Optimization failed.')
     } finally {
       setIsLoading(false)
+      onPendingChange?.(false)
     }
   }
 
